@@ -35,7 +35,7 @@ export async function updateSession(request: NextRequest) {
                       request.nextUrl.pathname.startsWith('/register') || 
                       request.nextUrl.pathname.startsWith('/auth')
                       
-  const isPublicRoute = request.nextUrl.pathname === '/'
+  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/health'
 
   // User is not logged in and tries to access a protected route
   if (!user && !isAuthRoute && !isPublicRoute) {
