@@ -16,13 +16,25 @@ import {
   Trash2,
   Lock,
   AlertCircle,
+  SlidersHorizontal,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react'
 import {
   updateMemberStatus,
   updateMemberRole,
   deleteMember,
   createAccountByAdmin,
+  updateMemberDetailedPermissions,
 } from './actions'
+import {
+  ALL_MODULES,
+  DEFAULT_ROLE_PERMISSIONS,
+  parseRoleData,
+  getAllUserPermissions,
+  UserPermissions,
+  ModuleKey,
+} from '@/utils/permissions'
 
 interface Profile {
   id: string
@@ -48,6 +60,12 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
   const [customPassword, setCustomPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+
+  // State Modal Phân quyền chi tiết (Xem, Thêm, Sửa, Xoá)
+  const [selectedUserForPerms, setSelectedUserForPerms] = useState<Profile | null>(null)
+  const [tempBaseRole, setTempBaseRole] = useState<'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh'>('phu_huynh')
+  const [tempPerms, setTempPerms] = useState<UserPermissions>({})
+  const [isSavingPerms, setIsSavingPerms] = useState(false)
 
   const roleDisplay: Record<string, string> = {
     admin: 'Quản trị viên (Admin)',
@@ -85,7 +103,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     }
   }
 
-  // Cập nhật phân quyền vai trò
+  // Cập nhật phân quyền vai trò nhanh qua dropdown
   const handleRoleChange = async (id: string, newRole: string) => {
     try {
       setLoadingId(id)
@@ -94,6 +112,76 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
       alert('Lỗi: ' + (err.message || 'Không thể cập nhật vai trò'))
     } finally {
       setLoadingId(null)
+    }
+  }
+
+  // Mở modal phân quyền chi tiết cho user
+  const handleOpenPermsModal = (user: Profile) => {
+    const roleData = parseRoleData(user.role)
+    const currentAllPerms = getAllUserPermissions(user.role)
+    setSelectedUserForPerms(user)
+    setTempBaseRole(roleData.baseRole)
+    setTempPerms(currentAllPerms)
+  }
+
+  // Bật/tắt 1 quyền cụ thể (view, add, edit, delete)
+  const handleTogglePerm = (modKey: ModuleKey, action: 'view' | 'add' | 'edit' | 'delete') => {
+    setTempPerms((prev) => {
+      const currentMod = prev[modKey] || { view: false, add: false, edit: false, delete: false }
+      const nextVal = !currentMod[action]
+      const updatedMod = { ...currentMod, [action]: nextVal }
+      // Nếu tắt 'view' thì cũng tắt add, edit, delete
+      if (action === 'view' && !nextVal) {
+        updatedMod.add = false
+        updatedMod.edit = false
+        updatedMod.delete = false
+      }
+      // Nếu bật add/edit/delete mà view chưa bật thì tự động bật view
+      if (action !== 'view' && nextVal) {
+        updatedMod.view = true
+      }
+      return {
+        ...prev,
+        [modKey]: updatedMod,
+      }
+    })
+  }
+
+  // Chọn toàn bộ quyền hoặc bỏ chọn toàn bộ quyền cho 1 module
+  const handleToggleAllForModule = (modKey: ModuleKey) => {
+    setTempPerms((prev) => {
+      const cur = prev[modKey] || { view: false, add: false, edit: false, delete: false }
+      const allChecked = cur.view && cur.add && cur.edit && cur.delete
+      return {
+        ...prev,
+        [modKey]: {
+          view: !allChecked,
+          add: !allChecked,
+          edit: !allChecked,
+          delete: !allChecked,
+        },
+      }
+    })
+  }
+
+  // Áp dụng quyền theo mẫu mặc định của một vai trò
+  const handleApplyRolePreset = (presetRole: 'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh') => {
+    setTempBaseRole(presetRole)
+    setTempPerms(JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS[presetRole])))
+  }
+
+  // Lưu phân quyền chi tiết
+  const handleSavePerms = async () => {
+    if (!selectedUserForPerms) return
+    setIsSavingPerms(true)
+    try {
+      await updateMemberDetailedPermissions(selectedUserForPerms.id, tempBaseRole, tempPerms)
+      alert('Đã cập nhật phân quyền chi tiết cho tài khoản!')
+      setSelectedUserForPerms(null)
+    } catch (err: any) {
+      alert('Lỗi: ' + (err.message || 'Không thể lưu phân quyền'))
+    } finally {
+      setIsSavingPerms(false)
     }
   }
 
@@ -214,10 +302,10 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
           <thead className="bg-[#bfe6f7]/70 dark:bg-[#103459]/80 text-slate-900 dark:text-cyan-100 font-bold border-b border-blue-200 dark:border-blue-900/60">
             <tr>
               <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40">Họ tên & Tài khoản đăng nhập</th>
-              <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 min-w-[150px]">Phân quyền vai trò</th>
+              <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 min-w-[190px]">Phân quyền vai trò & Menu</th>
               <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 text-center w-28">Trạng thái</th>
               <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 text-center w-28 whitespace-nowrap">Ngày tạo</th>
-              <th className="p-3.5 text-right whitespace-nowrap w-36">Thao tác</th>
+              <th className="p-3.5 text-right whitespace-nowrap w-40">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -235,6 +323,9 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                 // Display identifier (Phone number or Email)
                 const isInternalPhoneAccount = user.email?.includes('@phhs.a5.local')
                 const displayPhone = user.phone_number || (isInternalPhoneAccount ? user.email.split('@')[0] : null)
+
+                const roleData = parseRoleData(user.role)
+                const isCustomized = Boolean(roleData.customPerms && Object.keys(roleData.customPerms).length > 0)
 
                 return (
                   <tr key={user.id} className="hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition">
@@ -256,19 +347,37 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                     </td>
 
                     <td className="p-3.5 border-r border-slate-100 dark:border-slate-800">
-                      <select
-                        value={user.role}
-                        disabled={loadingId === user.id}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer ${
-                          roleBadgeStyle[user.role] || 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        <option value="hoc_sinh">Học sinh</option>
-                        <option value="phu_huynh">Phụ huynh</option>
-                        <option value="gvcn">GV Chủ nhiệm</option>
-                        <option value="admin">Quản trị viên (Admin)</option>
-                      </select>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={roleData.baseRole}
+                            disabled={loadingId === user.id}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                            className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer ${
+                              roleBadgeStyle[roleData.baseRole] || 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            <option value="hoc_sinh">Học sinh</option>
+                            <option value="phu_huynh">Phụ huynh</option>
+                            <option value="gvcn">GV Chủ nhiệm</option>
+                            <option value="admin">Quản trị viên (Admin)</option>
+                          </select>
+
+                          {/* Nút mở popup phân quyền chi tiết */}
+                          <button
+                            onClick={() => handleOpenPermsModal(user)}
+                            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border font-medium transition ${
+                              isCustomized
+                                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 shadow-2xs'
+                                : 'bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                            title="Tùy biến quyền xem, sửa, xoá, thêm từng menu"
+                          >
+                            <SlidersHorizontal className="w-3 h-3 text-blue-600 dark:text-cyan-400" />
+                            <span>{isCustomized ? 'Quyền tuỳ biến' : 'Phân quyền menu'}</span>
+                          </button>
+                        </div>
+                      </div>
                     </td>
 
                     <td className="p-3.5 border-r border-slate-100 dark:border-slate-800 text-center">
@@ -348,6 +457,170 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
           </tbody>
         </table>
       </div>
+
+      {/* MODAL PHÂN QUYỀN MENU CHI TIẾT (XEM, THÊM, SỬA, XOÁ) */}
+      {selectedUserForPerms && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-cyan-400">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 dark:text-white">
+                    Phân quyền hiển thị & thao tác theo Menu
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Tài khoản:{' '}
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {selectedUserForPerms.full_name || selectedUserForPerms.email}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUserForPerms(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Khung chọn nhanh mẫu quyền cơ sở */}
+            <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Áp dụng nhanh mẫu quyền:
+              </span>
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => handleApplyRolePreset('admin')}
+                  className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 transition font-medium"
+                >
+                  Admin (Toàn quyền)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyRolePreset('gvcn')}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900 text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-blue-800 transition font-medium"
+                >
+                  GVCN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyRolePreset('phu_huynh')}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition font-medium"
+                >
+                  Phụ huynh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyRolePreset('hoc_sinh')}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition font-medium"
+                >
+                  Học sinh
+                </button>
+              </div>
+            </div>
+
+            {/* Bảng ma trận phân quyền: Xem, Thêm, Sửa, Xoá */}
+            <div className="mt-3 flex-1 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold sticky top-0 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="p-2.5">Menu / Phân hệ</th>
+                    <th className="p-2.5 text-center w-20">Xem</th>
+                    <th className="p-2.5 text-center w-20">Thêm</th>
+                    <th className="p-2.5 text-center w-20">Sửa</th>
+                    <th className="p-2.5 text-center w-20">Xoá</th>
+                    <th className="p-2.5 text-center w-24">Chọn nhanh</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {ALL_MODULES.map((mod) => {
+                    const perm = tempPerms[mod.key] || { view: false, add: false, edit: false, delete: false }
+                    const isAll = perm.view && perm.add && perm.edit && perm.delete
+                    return (
+                      <tr key={mod.key} className="hover:bg-blue-50/30 dark:hover:bg-blue-950/20">
+                        <td className="p-2.5 font-medium text-slate-800 dark:text-slate-200">
+                          <span className="font-semibold">{mod.label}</span>
+                          <span className="ml-1.5 text-[10px] text-slate-400 font-mono">({mod.href})</span>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={perm.view}
+                            onChange={() => handleTogglePerm(mod.key, 'view')}
+                            className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                          />
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={perm.add}
+                            onChange={() => handleTogglePerm(mod.key, 'add')}
+                            className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                          />
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={perm.edit}
+                            onChange={() => handleTogglePerm(mod.key, 'edit')}
+                            className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                          />
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={perm.delete}
+                            onChange={() => handleTogglePerm(mod.key, 'delete')}
+                            className="w-4 h-4 text-rose-600 rounded cursor-pointer accent-rose-600"
+                          />
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAllForModule(mod.key)}
+                            className="text-[11px] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                          >
+                            {isAll ? 'Bỏ chọn' : 'Tất cả'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="pt-4 mt-3 flex justify-between items-center border-t border-slate-100 dark:border-slate-800 shrink-0">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                * Menu bị bỏ "Xem" sẽ tự động ẩn khỏi thanh điều hướng bên trái của người dùng này.
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserForPerms(null)}
+                  className="px-4 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePerms}
+                  disabled={isSavingPerms}
+                  className="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-sm flex items-center gap-1.5"
+                >
+                  {isSavingPerms ? 'Đang lưu...' : 'Lưu phân quyền'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL THÊM TÀI KHOẢN MỚI & PHÂN QUYỀN */}
       {showAddModal && (

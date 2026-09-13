@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { encodeRoleData, parseRoleData, UserPermissions } from '@/utils/permissions'
 
 async function checkIsAdmin() {
   const supabase = await createClient()
@@ -9,7 +10,8 @@ async function checkIsAdmin() {
   if (!user) throw new Error('Chưa đăng nhập')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin' && profile?.role !== 'gvcn') {
+  const roleData = parseRoleData(profile?.role)
+  if (roleData.baseRole !== 'admin' && roleData.baseRole !== 'gvcn') {
     throw new Error('Chỉ Quản trị viên hoặc GVCN mới có quyền thực hiện thao tác này')
   }
   return { supabase, user }
@@ -43,6 +45,27 @@ export async function updateMemberRole(id: string, role: string) {
   revalidatePath('/danh-ba')
 }
 
+// Cập nhật phân quyền chi tiết (Menu list: view, add, edit, delete)
+export async function updateMemberDetailedPermissions(
+  id: string,
+  baseRole: 'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh',
+  customPerms: UserPermissions
+) {
+  const { supabase } = await checkIsAdmin()
+
+  const encodedRole = encodeRoleData(baseRole, customPerms)
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role: encodedRole, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/admin/thanh-vien')
+  revalidatePath('/', 'layout')
+}
+
 // Xoá thành viên khỏi hệ thống
 export async function deleteMember(id: string) {
   const { supabase } = await checkIsAdmin()
@@ -58,16 +81,17 @@ export async function deleteMember(id: string) {
   revalidatePath('/danh-ba')
 }
 
-// Admin thêm tài khoản mới và phân quyền trực tiếp
+// Admin thêm tài khoản mới và phân quyền chi tiết trực tiếp
 export async function createAccountByAdmin(formData: {
   identifier: string // SĐT hoặc Email
   fullName: string
   role: 'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh'
   customPassword?: string
+  customPerms?: UserPermissions
 }) {
   await checkIsAdmin()
 
-  const { identifier, fullName, role, customPassword } = formData
+  const { identifier, fullName, role, customPassword, customPerms } = formData
   if (!identifier || !fullName) {
     throw new Error('Vui lòng điền đầy đủ thông tin tài khoản và họ tên!')
   }
@@ -93,9 +117,10 @@ export async function createAccountByAdmin(formData: {
     }
     phoneNumber = cleanPhone
     email = `${cleanPhone}@phhs.a5.local`
-    // Password default convention: <phone>_phhs or custom password if provided
     password = customPassword || `${cleanPhone}_phhs`
   }
+
+  const encodedRole = encodeRoleData(role, customPerms)
 
   // Call Supabase Auth signup API
   const res = await fetch(`${supabaseUrl}/auth/v1/signup`, {
@@ -110,7 +135,7 @@ export async function createAccountByAdmin(formData: {
       data: {
         full_name: fullName.trim(),
         phone_number: phoneNumber,
-        role,
+        role: encodedRole,
       },
     }),
   })
@@ -122,13 +147,12 @@ export async function createAccountByAdmin(formData: {
 
   const newUserId = authResult.user?.id || authResult.id
   if (newUserId) {
-    // Update profile to ensure correct role and active status
     const supabase = await createClient()
     await supabase
       .from('profiles')
       .update({
         full_name: fullName.trim(),
-        role,
+        role: encodedRole,
         status: 'active',
         phone_number: phoneNumber,
       })

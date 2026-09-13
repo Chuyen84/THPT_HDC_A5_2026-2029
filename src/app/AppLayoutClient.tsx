@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -24,17 +24,18 @@ import {
   Moon,
   Phone,
 } from 'lucide-react'
+import { getModulePermission, ModuleKey, parseRoleData } from '@/utils/permissions'
 
-const navItems = [
+const navItems: { href: string; icon: any; label: string; moduleKey?: ModuleKey }[] = [
   { href: '/', icon: Home, label: 'Trang chủ' },
-  { href: '/hoc-sinh', icon: GraduationCap, label: 'Học sinh' },
-  { href: '/thong-bao', icon: Bell, label: 'Thông báo' },
-  { href: '/danh-ba', icon: Users, label: 'Danh bạ' },
-  { href: '/quy-lop', icon: DollarSign, label: 'Quỹ lớp' },
-  { href: '/lich', icon: Calendar, label: 'Lịch' },
-  { href: '/tai-lieu', icon: FileText, label: 'Tài liệu' },
-  { href: '/khao-sat', icon: CheckSquare, label: 'Khảo sát' },
-  { href: '/hoi-dap', icon: MessageSquare, label: 'Hỏi đáp' },
+  { href: '/hoc-sinh', icon: GraduationCap, label: 'Học sinh', moduleKey: 'hoc-sinh' },
+  { href: '/thong-bao', icon: Bell, label: 'Thông báo', moduleKey: 'thong-bao' },
+  { href: '/danh-ba', icon: Users, label: 'Danh bạ', moduleKey: 'danh-ba' },
+  { href: '/quy-lop', icon: DollarSign, label: 'Quỹ lớp', moduleKey: 'quy-lop' },
+  { href: '/lich', icon: Calendar, label: 'Lịch', moduleKey: 'lich' },
+  { href: '/tai-lieu', icon: FileText, label: 'Tài liệu', moduleKey: 'tai-lieu' },
+  { href: '/khao-sat', icon: CheckSquare, label: 'Khảo sát', moduleKey: 'khao-sat' },
+  { href: '/hoi-dap', icon: MessageSquare, label: 'Hỏi đáp', moduleKey: 'hoi-dap' },
 ]
 
 export default function AppLayoutClient({
@@ -79,8 +80,14 @@ export default function AppLayoutClient({
   }
 
   // Display user identifier (Phone number or Full name or Email)
-  const displayName = profile?.full_name || profile?.phone_number || (user?.email?.includes('@phhs.a5.local') ? user.email.split('@')[0] : user?.email) || 'Thành viên'
-  const displayPhone = profile?.phone_number || (user?.email?.includes('@phhs.a5.local') ? user.email.split('@')[0] : '')
+  const displayName =
+    profile?.full_name ||
+    profile?.phone_number ||
+    (user?.email?.includes('@phhs.a5.local') ? user.email.split('@')[0] : user?.email) ||
+    'Thành viên'
+  const displayPhone =
+    profile?.phone_number ||
+    (user?.email?.includes('@phhs.a5.local') ? user.email.split('@')[0] : '')
 
   const roleLabels: Record<string, string> = {
     admin: 'Quản trị viên',
@@ -88,7 +95,20 @@ export default function AppLayoutClient({
     phu_huynh: 'Phụ huynh',
     hoc_sinh: 'Học sinh',
   }
-  const roleText = profile?.role ? (roleLabels[profile.role] || profile.role) : (isAdminOrGvcn ? 'GVCN / Admin' : 'Thành viên')
+
+  const roleData = parseRoleData(profile?.role)
+  const roleText = roleLabels[roleData.baseRole] || (isAdminOrGvcn ? 'GVCN / Admin' : 'Thành viên')
+
+  // Lọc các menu hiển thị dựa trên quyền 'view' của tài khoản
+  const visibleNavItems = useMemo(() => {
+    return navItems.filter((item) => {
+      // Trang chủ luôn luôn hiển thị
+      if (!item.moduleKey) return true
+      // Kiểm tra quyền xem của module
+      const perm = getModulePermission(profile?.role, item.moduleKey)
+      return perm.view
+    })
+  }, [profile?.role])
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100 transition-colors duration-200">
@@ -139,11 +159,15 @@ export default function AppLayoutClient({
 
         {/* Navigation links */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-thin">
-          <div className={`px-3 pb-2 text-[10px] font-bold text-cyan-200/60 uppercase tracking-wider ${collapsed ? 'text-center' : ''}`}>
+          <div
+            className={`px-3 pb-2 text-[10px] font-bold text-cyan-200/60 uppercase tracking-wider ${
+              collapsed ? 'text-center' : ''
+            }`}
+          >
             {collapsed ? '•••' : 'Menu chính'}
           </div>
 
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Link
@@ -170,7 +194,11 @@ export default function AppLayoutClient({
           {/* Admin / GVCN section */}
           {isAdminOrGvcn && (
             <div className="pt-4 mt-3 border-t border-white/10">
-              <div className={`px-3 pb-2 text-[10px] font-bold text-amber-300/80 uppercase tracking-wider ${collapsed ? 'text-center' : ''}`}>
+              <div
+                className={`px-3 pb-2 text-[10px] font-bold text-amber-300/80 uppercase tracking-wider ${
+                  collapsed ? 'text-center' : ''
+                }`}
+              >
                 {collapsed ? '•••' : 'Quản trị'}
               </div>
               <Link
@@ -184,7 +212,7 @@ export default function AppLayoutClient({
                 } ${collapsed ? 'justify-center px-2' : ''}`}
               >
                 <ShieldCheck className="w-5 h-5 shrink-0 text-amber-400" />
-                {!collapsed && <span className="truncate">Duyệt thành viên</span>}
+                {!collapsed && <span className="truncate">Quản trị & Phân quyền</span>}
               </Link>
             </div>
           )}
@@ -240,89 +268,66 @@ export default function AppLayoutClient({
                 title="Đăng xuất"
               >
                 <LogOut className="w-4 h-4 shrink-0" />
-                {!collapsed && <span className="truncate">Đăng xuất</span>}
+                {!collapsed && <span>Đăng xuất</span>}
               </button>
             </form>
           ) : (
             <Link
               href="/login"
-              className={`flex items-center gap-2.5 w-full p-2 rounded-xl text-xs font-medium text-cyan-200 hover:bg-white/10 transition ${
+              className={`flex items-center gap-2.5 w-full p-2 rounded-xl text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 transition ${
                 collapsed ? 'justify-center' : ''
               }`}
+              title="Đăng nhập"
             >
-              <div className="w-4 h-4 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px] shrink-0 font-bold">
-                +
-              </div>
-              {!collapsed && <span className="truncate">Đăng nhập (SĐT)</span>}
+              <School className="w-4 h-4 shrink-0" />
+              {!collapsed && <span>Đăng nhập</span>}
             </Link>
+          )}
+
+          {/* User info snippet */}
+          {user && !collapsed && (
+            <div className="px-2 pt-1 border-t border-white/10 text-left">
+              <div className="font-semibold text-xs text-white truncate">
+                {displayName}
+              </div>
+              <div className="text-[10px] text-cyan-200/70 truncate flex items-center justify-between">
+                <span>{roleText}</span>
+                {displayPhone && (
+                  <span className="font-mono text-cyan-300">{displayPhone}</span>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </aside>
 
-      {/* Main Full-Page Content Area */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        {/* Top Header Bar */}
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs transition-colors duration-200">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top bar on Mobile */}
+        <header className="h-14 lg:hidden bg-slate-900 text-white flex items-center justify-between px-4 border-b border-slate-800 shrink-0">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-1.5 -ml-1 text-slate-300 hover:text-white rounded-lg focus:outline-none"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
 
-            <div className="flex items-center gap-2">
-              <School className="w-5 h-5 text-blue-600 dark:text-cyan-400 hidden sm:inline" />
-              <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm sm:text-base truncate">
-                Cổng thông tin Lớp 10A5 - Niên khoá 2026 - 2029
-              </span>
-            </div>
-          </div>
+          <span className="font-bold text-sm tracking-tight text-white">
+            10A5 - THPT Hoài Đức C
+          </span>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleTheme}
-              className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
-              title={isDark ? 'Chuyển sang chế độ Sáng' : 'Chuyển sang chế độ Tối'}
-            >
-              {isDark ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-600" />
-              )}
-            </button>
-
-            {user ? (
-              <div className="flex items-center gap-2.5 text-xs">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 flex items-center justify-center font-bold text-blue-700 dark:text-cyan-400 uppercase">
-                  {displayName.slice(0, 2)}
-                </div>
-                <div className="hidden sm:flex flex-col text-left">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
-                    {displayName}
-                  </span>
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                    <span>{roleText}</span>
-                    {displayPhone && (
-                      <span className="font-mono text-slate-400">({displayPhone})</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <Link
-                href="/login"
-                className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition shadow-2xs"
-              >
-                Đăng nhập SĐT
-              </Link>
-            )}
-          </div>
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 text-slate-300 hover:text-white rounded-lg focus:outline-none"
+            title="Đổi giao diện"
+          >
+            {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-cyan-300" />}
+          </button>
         </header>
 
-        {/* Scrollable Content Container (Full Width & Height) */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100 dark:bg-slate-950 min-w-0 transition-colors duration-200">
-          <div className="w-full">
+        {/* Dynamic Page Content */}
+        <main className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950 p-3 sm:p-5 lg:p-6 transition-colors">
+          <div className="max-w-[1700px] mx-auto w-full">
             {children}
           </div>
         </main>
