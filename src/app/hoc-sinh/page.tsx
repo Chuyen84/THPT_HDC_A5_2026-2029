@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/utils/supabase/server'
+import { createClient } from '@/utils/supabase/server'
 import StudentManager from './StudentManager'
 import { GraduationCap } from 'lucide-react'
 
@@ -26,13 +26,13 @@ export default async function HocSinhPage() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <GraduationCap className="w-7 h-7 text-blue-600" />
-          Danh mục Học sinh Lớp 10A5
+      <div className="border-b border-slate-200 dark:border-slate-800 pb-4 transition-colors">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2.5">
+          <GraduationCap className="w-7 h-7 text-blue-600 dark:text-cyan-400" />
+          Danh sách Học sinh
         </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Quản lý hồ sơ học sinh, thông tin phụ huynh liên hệ và xuất/nhập dữ liệu file Excel
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Hồ sơ thông tin học sinh Lớp 10A5 - Niên khoá 2026 - 2029 và quản lý phụ huynh liên hệ
         </p>
       </div>
 

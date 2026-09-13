@@ -152,11 +152,9 @@ export default function StudentManager({
 
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
-      // Uncheck all in current filtered view
       const filteredIds = new Set(filtered.map((s) => s.id))
       setSelectedIds((prev) => prev.filter((id) => !filteredIds.has(id)))
     } else {
-      // Check all in current filtered view
       const newIds = new Set([...selectedIds, ...filtered.map((s) => s.id)])
       setSelectedIds(Array.from(newIds))
     }
@@ -246,18 +244,17 @@ export default function StudentManager({
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh sách học sinh')
 
-    // Set column widths
     const colWidths = [
-      { wch: 6 }, // STT
-      { wch: 24 }, // Họ tên
-      { wch: 10 }, // Giới tính
-      { wch: 14 }, // Ngày sinh
-      { wch: 28 }, // Địa chỉ
-      { wch: 20 }, // Bố
-      { wch: 16 }, // Điện thoại bố
-      { wch: 20 }, // Mẹ
-      { wch: 16 }, // Điện thoại mẹ
-      { wch: 20 }, // Ghi chú
+      { wch: 6 },
+      { wch: 24 },
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 28 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 20 },
     ]
     worksheet['!cols'] = colWidths
 
@@ -271,7 +268,6 @@ export default function StudentManager({
   const parseDateString = (val: any): string | null => {
     if (!val && val !== 0) return null
 
-    // Excel serial number (e.g. 40826)
     if (typeof val === 'number') {
       try {
         const date = new Date(Math.round((val - 25569) * 86400 * 1000))
@@ -284,10 +280,8 @@ export default function StudentManager({
     const str = String(val).trim()
     if (!str) return null
 
-    // Already YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
 
-    // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
     const dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/)
     if (dmyMatch) {
       const d = dmyMatch[1].padStart(2, '0')
@@ -297,13 +291,11 @@ export default function StudentManager({
       return `${y}-${m}-${d}`
     }
 
-    // Number digits string with potential trailing noise, e.g. "14/08/201114" or "14082011"
     const cleanDigits = str.replace(/[^\d]/g, '')
     if (cleanDigits.length >= 8) {
       const d = cleanDigits.slice(0, 2)
       const m = cleanDigits.slice(2, 4)
       const y = cleanDigits.slice(4, 8)
-      // Basic sanity check on month and day
       const dayNum = parseInt(d, 10)
       const monthNum = parseInt(m, 10)
       if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
@@ -314,12 +306,11 @@ export default function StudentManager({
     return null
   }
 
-  // Format Phone Number (Ensuring leading 0)
+  // Format Phone Number
   const formatPhone = (val: any): string => {
     if (!val && val !== 0) return ''
     let s = String(val).replace(/[\s\.\-\(\)]/g, '').trim()
     if (!s) return ''
-    // If 9 digits (common when Excel strips leading 0 from 09xxx / 03xxx / 08xxx etc.)
     if (/^\d{9}$/.test(s)) {
       s = '0' + s
     }
@@ -337,7 +328,7 @@ export default function StudentManager({
       .trim()
   }
 
-  // Handle Excel File Upload & Smart Parse
+  // Handle Excel File Upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -359,7 +350,6 @@ export default function StudentManager({
           return
         }
 
-        // Find header row
         let headerRowIndex = 0
         for (let i = 0; i < Math.min(rawSheet.length, 12); i++) {
           const rowNorm = rawSheet[i].map(normalizeText).join(' ')
@@ -377,7 +367,6 @@ export default function StudentManager({
         const rawHeaders = rawSheet[headerRowIndex] || []
         const dataRows = rawSheet.slice(headerRowIndex + 1)
 
-        // Identify column indexes
         const colIndexes = {
           stt: -1,
           fullName: -1,
@@ -467,8 +456,6 @@ export default function StudentManager({
           }
         })
 
-        // Standard column position fallback if headers weren't named uniquely:
-        // STT (0) | Họ tên (1) | Giới tính (2) | Ngày sinh (3) | Địa chỉ (4) | Bố (5) | ĐT Bố (6) | Mẹ (7) | ĐT Mẹ (8) | Ghi chú (9)
         if (colIndexes.fullName === -1 && rawHeaders.length >= 2) colIndexes.fullName = 1
         if (colIndexes.gender === -1 && rawHeaders.length >= 3) colIndexes.gender = 2
         if (colIndexes.dob === -1 && rawHeaders.length >= 4) colIndexes.dob = 3
@@ -486,7 +473,6 @@ export default function StudentManager({
           return String(val).trim()
         }
 
-        // Map existing students for quick duplicate lookup (by normalized full name)
         const existingStudentMap = new Map<string, Student>()
         students.forEach((s) => {
           existingStudentMap.set(normalizeText(s.full_name), s)
@@ -498,7 +484,6 @@ export default function StudentManager({
           const fullName = getCellStr(row, colIndexes.fullName)
           const normName = normalizeText(fullName)
 
-          // Skip empty or header repeating rows
           if (!fullName || normName === 'ho ten' || normName === 'ho va ten' || fullName.length < 2) {
             return
           }
@@ -517,7 +502,6 @@ export default function StudentManager({
           const motherPhone = formatPhone(colIndexes.motherPhone >= 0 ? row[colIndexes.motherPhone] : '')
           const notes = getCellStr(row, colIndexes.notes)
 
-          // Check for duplicate in database
           const existing = existingStudentMap.get(normName)
           const isDuplicate = !!existing
 
@@ -554,18 +538,16 @@ export default function StudentManager({
     e.target.value = ''
   }
 
-  // Count duplicates in parsed file
   const duplicateCount = useMemo(() => {
     return previewList.filter((p) => p.isDuplicate).length
   }, [previewList])
 
-  // Execute Batch Import with Overwrite/Append choice
+  // Execute Batch Import
   const handleConfirmImport = async () => {
     if (previewList.length === 0) return
 
     try {
       setLoading(true)
-
       const toInsert: any[] = []
       const toUpdate: { id: string; data: any }[] = []
 
@@ -589,7 +571,6 @@ export default function StudentManager({
               data: studentPayload,
             })
           }
-          // If 'skip', do nothing with duplicate
         } else {
           toInsert.push(studentPayload)
         }
@@ -616,7 +597,7 @@ export default function StudentManager({
     }
   }
 
-  // Handle Form Submit (Add or Edit)
+  // Handle Save (Add/Edit)
   const handleSaveStudent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -637,7 +618,6 @@ export default function StudentManager({
       if (editingStudent) {
         await updateStudent(editingStudent.id, data)
       } else {
-        // Check if student with same name already exists
         const exists = students.some(
           (s) => normalizeText(s.full_name) === normalizeText(data.full_name)
         )
@@ -661,7 +641,7 @@ export default function StudentManager({
     }
   }
 
-  // Handle Delete Single Student
+  // Delete single
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Bạn có chắc muốn xoá thông tin học sinh "${name}" không?`)) return
     try {
@@ -682,37 +662,37 @@ export default function StudentManager({
     <div className="space-y-4">
       {/* Top Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-xs text-blue-600 font-medium flex items-center gap-1.5">
+        <div className="bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl p-3.5 shadow-2xs transition-colors">
+          <div className="text-xs text-blue-600 dark:text-cyan-400 font-medium flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" /> Sĩ số lớp
           </div>
-          <div className="text-2xl font-bold text-blue-900 mt-0.5">
+          <div className="text-2xl font-bold text-blue-950 dark:text-white mt-0.5">
             {students.length}{' '}
-            <span className="text-xs font-normal text-slate-500">học sinh</span>
+            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">học sinh</span>
           </div>
         </div>
-        <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-xs text-emerald-600 font-medium">Học sinh Nam</div>
-          <div className="text-2xl font-bold text-emerald-900 mt-0.5">
-            {maleCount} <span className="text-xs font-normal text-slate-500">({students.length > 0 ? Math.round((maleCount / students.length) * 100) : 0}%)</span>
+        <div className="bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60 rounded-xl p-3.5 shadow-2xs transition-colors">
+          <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Học sinh Nam</div>
+          <div className="text-2xl font-bold text-emerald-950 dark:text-white mt-0.5">
+            {maleCount} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">({students.length > 0 ? Math.round((maleCount / students.length) * 100) : 0}%)</span>
           </div>
         </div>
-        <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-xs text-rose-600 font-medium">Học sinh Nữ</div>
-          <div className="text-2xl font-bold text-rose-900 mt-0.5">
-            {femaleCount} <span className="text-xs font-normal text-slate-500">({students.length > 0 ? Math.round((femaleCount / students.length) * 100) : 0}%)</span>
+        <div className="bg-rose-50/80 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/60 rounded-xl p-3.5 shadow-2xs transition-colors">
+          <div className="text-xs text-rose-600 dark:text-rose-400 font-medium">Học sinh Nữ</div>
+          <div className="text-2xl font-bold text-rose-950 dark:text-white mt-0.5">
+            {femaleCount} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">({students.length > 0 ? Math.round((femaleCount / students.length) * 100) : 0}%)</span>
           </div>
         </div>
-        <div className="bg-purple-50/70 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
-          <div className="text-xs text-purple-600 font-medium">Khối / Chuyên đề</div>
-          <div className="text-sm font-bold text-purple-900 mt-1 truncate">
+        <div className="bg-purple-50/80 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/60 rounded-xl p-3.5 shadow-2xs transition-colors">
+          <div className="text-xs text-purple-600 dark:text-purple-400 font-medium">Khối / Chuyên đề</div>
+          <div className="text-sm font-bold text-purple-950 dark:text-white mt-1 truncate">
             Toán, Vật lý, Ngữ văn
           </div>
         </div>
       </div>
 
       {/* Action Toolbar & Filters */}
-      <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+      <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-2xs transition-colors">
         {/* Row 1: Search and Action Buttons */}
         <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
           <div className="relative w-full lg:w-96">
@@ -722,12 +702,11 @@ export default function StudentManager({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tên học sinh, địa chỉ, SĐT bố/mẹ..."
-              className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+              className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs transition-colors"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
-            {/* Batch delete button */}
             {canManage && selectedIds.length > 0 && (
               <button
                 onClick={handleBatchDelete}
@@ -740,12 +719,11 @@ export default function StudentManager({
               </button>
             )}
 
-            {/* Clear all button */}
             {canManage && students.length > 0 && selectedIds.length === 0 && (
               <button
                 onClick={handleClearAll}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-xs font-medium px-3 py-2 rounded-xl transition shadow-2xs"
+                className="inline-flex items-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 text-xs font-medium px-3 py-2 rounded-xl transition shadow-2xs"
                 title="Xoá toàn bộ danh sách"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -753,17 +731,15 @@ export default function StudentManager({
               </button>
             )}
 
-            {/* Export Button */}
             <button
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-2xs"
+              className="inline-flex items-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-2xs"
               title="Xuất file Excel"
             >
-              <Download className="w-4 h-4 text-emerald-600" />
+              <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Xuất Excel</span>
             </button>
 
-            {/* Import Button */}
             {canManage && (
               <>
                 <input
@@ -775,16 +751,15 @@ export default function StudentManager({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-2xs"
+                  className="inline-flex items-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-2xs"
                   title="Nhập từ file Excel"
                 >
-                  <Upload className="w-4 h-4 text-blue-600" />
+                  <Upload className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
                   <span>Nhập Excel</span>
                 </button>
               </>
             )}
 
-            {/* Add Student Button */}
             {canManage && (
               <button
                 onClick={() => {
@@ -800,19 +775,18 @@ export default function StudentManager({
           </div>
         </div>
 
-        {/* Row 2: Filters (Gender, Month, Year) */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 text-xs">
-          <div className="flex items-center gap-1 text-slate-500 font-medium mr-1">
+        {/* Row 2: Filters */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+          <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium mr-1">
             <Filter className="w-3.5 h-3.5" /> Bộ lọc:
           </div>
 
-          {/* Gender Filter */}
-          <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
             <span className="text-slate-400">Giới tính:</span>
             <select
               value={filterGender}
               onChange={(e) => setFilterGender(e.target.value)}
-              className="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer"
+              className="bg-transparent font-medium text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả</option>
               <option value="Nam">Nam</option>
@@ -820,13 +794,12 @@ export default function StudentManager({
             </select>
           </div>
 
-          {/* Month Filter */}
-          <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
             <span className="text-slate-400">Tháng sinh:</span>
             <select
               value={filterMonth}
               onChange={(e) => setFilterMonth(e.target.value)}
-              className="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer"
+              className="bg-transparent font-medium text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả các tháng</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -837,13 +810,12 @@ export default function StudentManager({
             </select>
           </div>
 
-          {/* Year Filter */}
-          <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
             <span className="text-slate-400">Năm sinh:</span>
             <select
               value={filterYear}
               onChange={(e) => setFilterYear(e.target.value)}
-              className="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer"
+              className="bg-transparent font-medium text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả các năm</option>
               {availableYears.map((y) => (
@@ -854,7 +826,6 @@ export default function StudentManager({
             </select>
           </div>
 
-          {/* Reset Filters button if any filter is active */}
           {(filterGender !== 'ALL' || filterMonth !== 'ALL' || filterYear !== 'ALL' || search) && (
             <button
               onClick={() => {
@@ -863,7 +834,7 @@ export default function StudentManager({
                 setFilterMonth('ALL')
                 setFilterYear('ALL')
               }}
-              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline ml-auto font-medium"
+              className="inline-flex items-center gap-1 text-blue-600 dark:text-cyan-400 hover:underline ml-auto font-medium"
             >
               <RefreshCw className="w-3 h-3" /> Đặt lại bộ lọc
             </button>
@@ -871,50 +842,49 @@ export default function StudentManager({
         </div>
       </div>
 
-      {/* Main Table: Standard Columns exactly matching Excel */}
-      {/* STT | Họ tên | Giới tính | Ngày sinh | Địa chỉ | Bố | Điện thoại bố | Mẹ | Điện thoại mẹ | Ghi chú */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Main Table: Standard Columns */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm border-collapse">
-            <thead className="bg-[#bfe6f7]/70 text-slate-800 font-bold border-b border-blue-200">
+            <thead className="bg-[#bfe6f7]/70 dark:bg-[#103459]/80 text-slate-900 dark:text-cyan-100 font-bold border-b border-blue-200 dark:border-blue-900/60">
               <tr>
                 {canManage && (
-                  <th className="p-3 text-center w-10 border-r border-blue-200">
+                  <th className="p-3 text-center w-10 border-r border-blue-200 dark:border-blue-900/40">
                     <button
                       type="button"
                       onClick={handleToggleSelectAll}
-                      className="text-slate-600 hover:text-blue-600 focus:outline-none"
+                      className="text-slate-600 dark:text-slate-300 hover:text-blue-600 focus:outline-none"
                       title={isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                     >
                       {isAllSelected ? (
-                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                        <CheckSquare className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
                       ) : (
-                        <Square className="w-4 h-4 text-slate-400" />
+                        <Square className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                       )}
                     </button>
                   </th>
                 )}
-                <th className="p-3 text-center w-12 border-r border-blue-200">STT</th>
-                <th className="p-3 border-r border-blue-200 min-w-[170px]">Họ tên</th>
-                <th className="p-3 text-center border-r border-blue-200 w-24">Giới tính</th>
-                <th className="p-3 border-r border-blue-200 w-28 text-center">Ngày sinh</th>
-                <th className="p-3 border-r border-blue-200 min-w-[190px]">Địa chỉ</th>
-                <th className="p-3 border-r border-blue-200 min-w-[140px]">Bố</th>
-                <th className="p-3 border-r border-blue-200 min-w-[125px]">Điện thoại bố</th>
-                <th className="p-3 border-r border-blue-200 min-w-[140px]">Mẹ</th>
-                <th className="p-3 border-r border-blue-200 min-w-[125px]">Điện thoại mẹ</th>
-                <th className="p-3 border-r border-blue-200 min-w-[140px]">Ghi chú</th>
+                <th className="p-3 text-center w-12 border-r border-blue-200 dark:border-blue-900/40">STT</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[170px]">Họ tên</th>
+                <th className="p-3 text-center border-r border-blue-200 dark:border-blue-900/40 w-24">Giới tính</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 w-28 text-center">Ngày sinh</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[190px]">Địa chỉ</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[140px]">Bố</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[125px]">Điện thoại bố</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[140px]">Mẹ</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[125px]">Điện thoại mẹ</th>
+                <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[140px]">Ghi chú</th>
                 {canManage && <th className="p-3 text-center w-20">Thao tác</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filtered.length === 0 ? (
                 <tr>
                   <td
                     colSpan={canManage ? 12 : 10}
-                    className="p-12 text-center text-slate-400"
+                    className="p-12 text-center text-slate-400 dark:text-slate-500"
                   >
-                    <GraduationCap className="w-12 h-12 mx-auto text-slate-300 mb-2" />
+                    <GraduationCap className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
                     Không tìm thấy học sinh nào phù hợp. Bấm &quot;Thêm học sinh&quot; hoặc &quot;Nhập Excel&quot; để thêm dữ liệu.
                   </td>
                 </tr>
@@ -922,7 +892,6 @@ export default function StudentManager({
                 filtered.map((student, idx) => {
                   const isSelected = selectedIds.includes(student.id)
 
-                  // Format DOB DD/MM/YYYY
                   let dobDisplay = '-'
                   if (student.dob) {
                     const p = student.dob.split('-')
@@ -933,81 +902,81 @@ export default function StudentManager({
                   return (
                     <tr
                       key={student.id}
-                      className={`hover:bg-blue-50/40 transition ${
-                        isSelected ? 'bg-blue-50/60' : ''
+                      className={`hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition ${
+                        isSelected ? 'bg-blue-50/60 dark:bg-blue-950/50' : ''
                       }`}
                     >
                       {canManage && (
-                        <td className="p-3 text-center border-r border-slate-100">
+                        <td className="p-3 text-center border-r border-slate-100 dark:border-slate-800">
                           <button
                             type="button"
                             onClick={() => handleToggleSelectRow(student.id)}
                             className="text-slate-400 hover:text-blue-600 focus:outline-none"
                           >
                             {isSelected ? (
-                              <CheckSquare className="w-4 h-4 text-blue-600" />
+                              <CheckSquare className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
                             ) : (
-                              <Square className="w-4 h-4 text-slate-300" />
+                              <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                             )}
                           </button>
                         </td>
                       )}
-                      <td className="p-3 text-center font-medium text-slate-500 border-r border-slate-100">
+                      <td className="p-3 text-center font-medium text-slate-500 dark:text-slate-400 border-r border-slate-100 dark:border-slate-800">
                         {idx + 1}
                       </td>
-                      <td className="p-3 font-semibold text-slate-900 border-r border-slate-100 whitespace-nowrap">
+                      <td className="p-3 font-semibold text-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         {student.full_name}
                       </td>
-                      <td className="p-3 text-center border-r border-slate-100">
+                      <td className="p-3 text-center border-r border-slate-100 dark:border-slate-800">
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                             student.gender === 'Nữ'
-                              ? 'bg-rose-50 text-rose-600 border border-rose-200'
-                              : 'bg-blue-50 text-blue-600 border border-blue-200'
+                              ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60'
+                              : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-300 border border-blue-200 dark:border-blue-900/60'
                           }`}
                         >
                           {student.gender || 'Nam'}
                         </span>
                       </td>
-                      <td className="p-3 text-slate-600 text-center border-r border-slate-100 whitespace-nowrap">
+                      <td className="p-3 text-slate-600 dark:text-slate-300 text-center border-r border-slate-100 dark:border-slate-800 whitespace-nowrap">
                         {dobDisplay}
                       </td>
-                      <td className="p-3 text-slate-600 border-r border-slate-100">
+                      <td className="p-3 text-slate-600 dark:text-slate-300 border-r border-slate-100 dark:border-slate-800">
                         {student.address || '-'}
                       </td>
-                      <td className="p-3 text-slate-800 border-r border-slate-100 font-medium">
+                      <td className="p-3 text-slate-800 dark:text-slate-200 border-r border-slate-100 dark:border-slate-800 font-medium">
                         {student.father_name || '-'}
                       </td>
-                      <td className="p-3 text-slate-600 border-r border-slate-100 whitespace-nowrap font-mono text-xs">
+                      <td className="p-3 text-slate-600 dark:text-slate-300 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap font-mono text-xs">
                         {student.father_phone ? (
                           <a
                             href={`tel:${student.father_phone}`}
-                            className="text-blue-600 hover:underline flex items-center gap-1"
+                            className="text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
                           >
-                            <Phone className="w-3 h-3 text-slate-400" />
+                            <Phone className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                             {student.father_phone}
                           </a>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className="p-3 text-slate-800 border-r border-slate-100 font-medium">
+                      <td className="p-3 text-slate-800 dark:text-slate-200 border-r border-slate-100 dark:border-slate-800 font-medium">
                         {student.mother_name || '-'}
                       </td>
-                      <td className="p-3 text-slate-600 border-r border-slate-100 whitespace-nowrap font-mono text-xs">
+                      <td className="p-3 text-slate-600 dark:text-slate-300 border-r border-slate-100 dark:border-slate-800 whitespace-nowrap font-mono text-xs">
                         {student.mother_phone ? (
                           <a
                             href={`tel:${student.mother_phone}`}
-                            className="text-blue-600 hover:underline flex items-center gap-1"
+                            className="text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
                           >
-                            <Phone className="w-3 h-3 text-slate-400" />
+                            <Phone className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                             {student.mother_phone}
                           </a>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className="p-3 text-slate-500 border-r border-slate-100 text-xs">
+                      <td className="p-3 text-slate-500 dark:text-slate-400 border-r border-slate-100 dark:border-slate-800 text-xs">
                         {student.notes || '-'}
                       </td>
                       {canManage && (
@@ -1018,7 +987,7 @@ export default function StudentManager({
                                 setEditingStudent(student)
                                 setShowModal(true)
                               }}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition"
                               title="Sửa thông tin"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -1028,7 +997,7 @@ export default function StudentManager({
                                 handleDelete(student.id, student.full_name)
                               }
                               disabled={deletingId === student.id}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition"
                               title="Xoá học sinh"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1047,17 +1016,17 @@ export default function StudentManager({
 
       {/* Modal Add / Edit Student */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white">
                 {editingStudent
                   ? 'Cập nhật thông tin học sinh'
                   : 'Thêm học sinh mới'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1066,7 +1035,7 @@ export default function StudentManager({
             <form onSubmit={handleSaveStudent} className="space-y-4 mt-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Họ và tên học sinh <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1074,17 +1043,17 @@ export default function StudentManager({
                     required
                     defaultValue={editingStudent?.full_name || ''}
                     placeholder="VD: Nguyễn Văn Nam"
-                    className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Giới tính
                   </label>
                   <select
                     name="gender"
                     defaultValue={editingStudent?.gender || 'Nam'}
-                    className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
@@ -1094,87 +1063,87 @@ export default function StudentManager({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Ngày sinh
                   </label>
                   <input
                     name="dob"
                     type="date"
                     defaultValue={editingStudent?.dob || ''}
-                    className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Địa chỉ
                   </label>
                   <input
                     name="address"
                     defaultValue={editingStudent?.address || ''}
                     placeholder="VD: Thôn 1, Hoài Đức, Hà Nội"
-                    className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Thông tin bố & mẹ */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              {/* Thông tin phụ huynh */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+                <div className="text-xs font-bold text-slate-700 dark:text-cyan-300 uppercase tracking-wider">
                   Thông tin phụ huynh
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">
+                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                       Họ tên Bố
                     </label>
                     <input
                       name="father_name"
                       defaultValue={editingStudent?.father_name || ''}
                       placeholder="Họ tên bố..."
-                      className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">
+                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                       Điện thoại Bố
                     </label>
                     <input
                       name="father_phone"
                       defaultValue={editingStudent?.father_phone || ''}
                       placeholder="VD: 0912345678"
-                      className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">
+                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                       Họ tên Mẹ
                     </label>
                     <input
                       name="mother_name"
                       defaultValue={editingStudent?.mother_name || ''}
                       placeholder="Họ tên mẹ..."
-                      className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-600 mb-1">
+                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">
                       Điện thoại Mẹ
                     </label>
                     <input
                       name="mother_phone"
                       defaultValue={editingStudent?.mother_phone || ''}
                       placeholder="VD: 0987654321"
-                      className="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Ghi chú
                 </label>
                 <textarea
@@ -1182,15 +1151,15 @@ export default function StudentManager({
                   rows={2}
                   defaultValue={editingStudent?.notes || ''}
                   placeholder="Ghi chú về học sinh, chuyên đề học..."
-                  className="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 ></textarea>
               </div>
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition"
+                  className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium transition"
                 >
                   Hủy
                 </button>
@@ -1209,39 +1178,38 @@ export default function StudentManager({
 
       {/* Modal Preview Import Excel with Deduplication Choice */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-5xl w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-5xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+                <FileSpreadsheet className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">
+                  <h2 className="text-lg font-bold text-slate-800 dark:text-white">
                     Xem trước dữ liệu Excel ({previewList.length} học sinh)
                   </h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Kiểm tra các cột Ngày sinh, SĐT Bố/Mẹ và tuỳ chọn xử lý dữ liệu trùng lặp
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowImportModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Duplicate Notice & Decision Bar */}
             {duplicateCount > 0 ? (
-              <div className="mt-3 p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 text-amber-900 font-medium">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="mt-3 p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-medium">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>
                     Phát hiện <b>{duplicateCount}</b> học sinh đã có tên trong danh sách hiện tại.
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-amber-800 font-semibold">Xử lý trùng lặp:</span>
+                  <span className="text-amber-800 dark:text-amber-300 font-semibold">Xử lý trùng lặp:</span>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
@@ -1251,7 +1219,7 @@ export default function StudentManager({
                       onChange={() => setDuplicateAction('overwrite')}
                       className="text-amber-600 focus:ring-amber-500"
                     />
-                    <span className="font-medium text-amber-950">Ghi đè / Cập nhật</span>
+                    <span className="font-medium text-amber-950 dark:text-amber-100">Ghi đè / Cập nhật</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -1262,20 +1230,19 @@ export default function StudentManager({
                       onChange={() => setDuplicateAction('skip')}
                       className="text-amber-600 focus:ring-amber-500"
                     />
-                    <span className="font-medium text-amber-950">Bỏ qua (không lưu)</span>
+                    <span className="font-medium text-amber-950 dark:text-amber-100">Bỏ qua (không lưu)</span>
                   </label>
                 </div>
               </div>
             ) : (
-              <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+              <div className="mt-3 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl text-xs text-emerald-800 dark:text-emerald-300">
                 ✓ Tất cả {previewList.length} học sinh trong file đều mới, sẽ được thêm nối tiếp vào danh sách.
               </div>
             )}
 
-            {/* Data Preview Table */}
-            <div className="flex-1 overflow-y-auto mt-3 border border-slate-200 rounded-xl">
+            <div className="flex-1 overflow-y-auto mt-3 border border-slate-200 dark:border-slate-800 rounded-xl">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 border-b border-slate-200 z-10">
+                <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold sticky top-0 border-b border-slate-200 dark:border-slate-700 z-10">
                   <tr>
                     <th className="p-2.5 text-center w-10">STT</th>
                     <th className="p-2.5">Họ tên</th>
@@ -1290,7 +1257,7 @@ export default function StudentManager({
                     <th className="p-2.5 text-center w-20">Trạng thái</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {previewList.map((item, i) => {
                     let dobDisplay = '-'
                     if (item.dob) {
@@ -1302,45 +1269,45 @@ export default function StudentManager({
                     return (
                       <tr
                         key={i}
-                        className={`hover:bg-slate-50/80 ${
-                          item.isDuplicate ? 'bg-amber-50/40' : ''
+                        className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/60 ${
+                          item.isDuplicate ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''
                         }`}
                       >
-                        <td className="p-2.5 text-center text-slate-500">{i + 1}</td>
-                        <td className="p-2.5 font-semibold text-slate-800 whitespace-nowrap">
+                        <td className="p-2.5 text-center text-slate-500 dark:text-slate-400">{i + 1}</td>
+                        <td className="p-2.5 font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap">
                           {item.full_name}
                         </td>
                         <td className="p-2.5 text-center">
                           <span
                             className={`px-2 py-0.5 rounded text-[11px] font-medium ${
                               item.gender === 'Nữ'
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-blue-100 text-blue-700'
+                                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                                : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-cyan-300'
                             }`}
                           >
                             {item.gender}
                           </span>
                         </td>
-                        <td className="p-2.5 text-center font-medium text-slate-700 whitespace-nowrap">
+                        <td className="p-2.5 text-center font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
                           {dobDisplay !== '-' ? (
-                            <span className="text-emerald-700 font-semibold">{dobDisplay}</span>
+                            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{dobDisplay}</span>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
                         </td>
-                        <td className="p-2.5 text-slate-600">{item.address || '-'}</td>
-                        <td className="p-2.5 text-slate-700">{item.father_name || '-'}</td>
-                        <td className="p-2.5 font-mono font-medium text-slate-800 whitespace-nowrap">
+                        <td className="p-2.5 text-slate-600 dark:text-slate-300">{item.address || '-'}</td>
+                        <td className="p-2.5 text-slate-700 dark:text-slate-300">{item.father_name || '-'}</td>
+                        <td className="p-2.5 font-mono font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
                           {item.father_phone ? (
-                            <span className="text-blue-700 font-semibold">{item.father_phone}</span>
+                            <span className="text-blue-700 dark:text-cyan-400 font-semibold">{item.father_phone}</span>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
                         </td>
-                        <td className="p-2.5 text-slate-700">{item.mother_name || '-'}</td>
-                        <td className="p-2.5 font-mono font-medium text-slate-800 whitespace-nowrap">
+                        <td className="p-2.5 text-slate-700 dark:text-slate-300">{item.mother_name || '-'}</td>
+                        <td className="p-2.5 font-mono font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
                           {item.mother_phone ? (
-                            <span className="text-blue-700 font-semibold">{item.mother_phone}</span>
+                            <span className="text-blue-700 dark:text-cyan-400 font-semibold">{item.mother_phone}</span>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
@@ -1348,11 +1315,11 @@ export default function StudentManager({
                         <td className="p-2.5 text-slate-400">{item.notes || '-'}</td>
                         <td className="p-2.5 text-center whitespace-nowrap">
                           {item.isDuplicate ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                               Trùng tên
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200">
                               Mới
                             </span>
                           )}
@@ -1364,16 +1331,15 @@ export default function StudentManager({
               </table>
             </div>
 
-            {/* Bottom Actions */}
-            <div className="pt-3.5 flex justify-between items-center border-t border-slate-100 mt-3">
-              <div className="text-xs text-slate-500">
+            <div className="pt-3.5 flex justify-between items-center border-t border-slate-100 dark:border-slate-800 mt-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
                 Tổng cộng: <b>{previewList.length}</b> bản ghi ({previewList.length - duplicateCount} mới, {duplicateCount} trùng)
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 text-xs sm:text-sm text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition"
+                  className="px-4 py-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium transition"
                 >
                   Hủy bỏ
                 </button>
