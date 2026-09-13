@@ -4,6 +4,8 @@ import './globals.css'
 import Link from 'next/link'
 import { Home, Bell, Users, DollarSign, Calendar, FileText, CheckSquare, MessageSquare } from 'lucide-react'
 
+import { createClient } from '@/utils/supabase/server'
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -22,11 +24,16 @@ const navItems = [
   { href: '/hoi-dap', icon: MessageSquare, label: 'Hỏi đáp' },
 ]
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-slate-50 text-slate-900 flex flex-col min-h-screen`}>
@@ -39,10 +46,18 @@ export default function RootLayout({
               </div>
               Lớp 10A5
             </Link>
-            <div>
-              <Link href="/login" className="text-sm bg-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-800 transition">
-                Đăng nhập
-              </Link>
+            <div className="flex items-center gap-4">
+              {user ? (
+                <form action="/auth/signout" method="post">
+                  <button className="text-sm bg-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-800 transition">
+                    Đăng xuất
+                  </button>
+                </form>
+              ) : (
+                <Link href="/login" className="text-sm bg-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-800 transition">
+                  Đăng nhập
+                </Link>
+              )}
             </div>
           </div>
         </header>
