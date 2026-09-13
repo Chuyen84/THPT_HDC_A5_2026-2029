@@ -34,6 +34,18 @@ export default async function RootLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
+  let isAdminOrGvcn = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role === 'admin' || profile?.role === 'gvcn') {
+      isAdminOrGvcn = true
+    }
+  }
+
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-slate-50 text-slate-900 flex flex-col min-h-screen`}>
@@ -76,6 +88,14 @@ export default async function RootLayout({
                     </Link>
                   </li>
                 ))}
+                {isAdminOrGvcn && (
+                  <li className="pt-2 border-t border-slate-100">
+                    <Link href="/admin/thanh-vien" className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition font-semibold">
+                      <Users className="w-5 h-5 text-amber-600" />
+                      <span>Duyệt thành viên</span>
+                    </Link>
+                  </li>
+                )}
               </ul>
             </nav>
           </aside>
