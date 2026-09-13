@@ -21,9 +21,19 @@ export async function register(formData: FormData) {
   const { error } = await supabase.auth.signUp(data)
 
   if (error) {
-    redirect('/register?message=Could not authenticate user')
+    redirect(`/register?message=${encodeURIComponent(error.message)}`)
   }
 
   revalidatePath('/', 'layout')
+
+  // Check profile status
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('status').eq('id', user.id).single()
+    if (profile?.status === 'active') {
+      redirect('/')
+    }
+  }
+
   redirect('/pending')
 }

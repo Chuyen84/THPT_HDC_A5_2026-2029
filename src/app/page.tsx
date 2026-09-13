@@ -12,6 +12,12 @@ export default async function HomePage() {
     profile = data
   }
 
+  const { data: recentAnnouncements } = await supabase
+    .from('announcements')
+    .select('*, profiles(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(3)
+
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
@@ -66,46 +72,45 @@ export default async function HomePage() {
       {/* Recent Feed */}
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-slate-800">Hoạt động gần đây</h2>
+          <h2 className="text-lg font-bold text-slate-800">Thông báo mới nhất</h2>
+          <Link href="/thong-bao" className="text-sm font-medium text-blue-600 hover:underline">
+            Xem tất cả
+          </Link>
         </div>
         
-        <div className="space-y-4">
-          {/* Mockup post 1 */}
-          <div className="p-4 border border-slate-100 rounded-xl">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-600">
-                  GV
-                </div>
-                <div>
-                  <div className="font-medium text-slate-800">Cô Trần Thị B</div>
-                  <div className="text-xs text-slate-500">Giáo viên chủ nhiệm • 2 giờ trước</div>
-                </div>
-              </div>
-              <span className="bg-red-100 text-red-600 text-xs px-2 py-1 rounded font-medium">Quan trọng</span>
+        <div className="space-y-3">
+          {(!recentAnnouncements || recentAnnouncements.length === 0) ? (
+            <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-sm">
+              Chưa có thông báo nào được đăng.
             </div>
-            <h3 className="font-bold text-slate-800 mb-1">Nhắc nhở họp phụ huynh đầu năm</h3>
-            <p className="text-slate-600 text-sm">
-              Kính gửi các vị phụ huynh, Chủ nhật tuần này (17/09) vào lúc 8h00 sáng lớp chúng ta sẽ tổ chức buổi họp phụ huynh đầu năm. Mong mọi người sắp xếp thời gian tham dự đầy đủ.
-            </p>
-          </div>
-          
-          {/* Mockup post 2 */}
-          <div className="p-4 border border-slate-100 rounded-xl">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center font-bold text-orange-600">
-                L
+          ) : (
+            recentAnnouncements.map((item) => (
+              <div key={item.id} className="p-4 border border-slate-100 rounded-xl bg-white shadow-sm hover:shadow-md transition">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-600 text-sm">
+                      {item.profiles?.full_name ? item.profiles.full_name.charAt(0).toUpperCase() : 'A'}
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-800 text-sm">{item.profiles?.full_name || 'Người dùng'}</div>
+                      <div className="text-[11px] text-slate-400">
+                        {new Date(item.created_at).toLocaleDateString('vi-VN')}
+                      </div>
+                    </div>
+                  </div>
+                  {item.is_important && (
+                    <span className="bg-red-50 text-red-600 border border-red-200 text-xs px-2 py-0.5 rounded-full font-medium">
+                      Quan trọng
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-slate-800 text-base mb-1">{item.title}</h3>
+                <p className="text-slate-600 text-sm line-clamp-2">
+                  {item.content}
+                </p>
               </div>
-              <div>
-                <div className="font-medium text-slate-800">Nguyễn Văn Lớp Trưởng</div>
-                <div className="text-xs text-slate-500">Học sinh • 5 giờ trước</div>
-              </div>
-            </div>
-            <h3 className="font-bold text-slate-800 mb-1">Thu tiền áo đồng phục</h3>
-            <p className="text-slate-600 text-sm">
-              Các bạn nhớ ngày mai mang theo tiền áo đồng phục (150k) để nộp cho thủ quỹ nhé. Ai chưa nộp thì tranh thủ nha!
-            </p>
-          </div>
+            ))
+          )}
         </div>
       </div>
     </div>

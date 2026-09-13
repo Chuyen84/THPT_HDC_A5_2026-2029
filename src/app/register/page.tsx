@@ -1,11 +1,24 @@
 import { register } from './actions'
 import Link from 'next/link'
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ message?: string }>
+}) {
+  const params = await searchParams
+  const message = params?.message
+
   return (
     <div className="max-w-md mx-auto mt-10">
       <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100">
         <h1 className="text-2xl font-bold text-center text-blue-600 mb-6">Đăng ký tài khoản</h1>
+        
+        {message && (
+          <div className="mb-4 p-3 rounded bg-red-50 text-red-600 text-sm border border-red-200">
+            {message}
+          </div>
+        )}
         
         <form className="space-y-4">
           <div>

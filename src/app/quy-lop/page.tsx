@@ -1,9 +1,24 @@
 import { DollarSign } from 'lucide-react'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import FundTable from './FundTable'
 
 export default async function QuyLopPage() {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  let canManage = false
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role === 'admin' || profile?.role === 'gvcn') {
+      canManage = true
+    }
+  }
 
   // Lấy dữ liệu quỹ lớp
   const { data: funds } = await supabase
@@ -52,7 +67,7 @@ export default async function QuyLopPage() {
       </div>
       
       <div className="space-y-4 mt-8">
-        <h2 className="text-lg font-bold text-slate-800">Lịch sử giao dịch</h2>
+        <h2 className="text-lg font-bold text-slate-800">Lịch sử giao dịch ({funds?.length || 0})</h2>
         
         {!funds || funds.length === 0 ? (
           <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
@@ -60,32 +75,7 @@ export default async function QuyLopPage() {
             <p>Chưa có giao dịch nào.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="p-4 font-medium">Ngày</th>
-                  <th className="p-4 font-medium">Nội dung</th>
-                  <th className="p-4 font-medium">Người tạo</th>
-                  <th className="p-4 font-medium text-right">Số tiền</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {funds.map((fund) => (
-                  <tr key={fund.id} className="hover:bg-slate-50 transition">
-                    <td className="p-4 text-slate-600">
-                      {new Date(fund.transaction_date).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="p-4 font-medium text-slate-800">{fund.title}</td>
-                    <td className="p-4 text-slate-600">{fund.profiles?.full_name || 'N/A'}</td>
-                    <td className={`p-4 text-right font-bold ${fund.type === 'thu' ? 'text-green-600' : 'text-orange-600'}`}>
-                      {fund.type === 'thu' ? '+' : '-'}{formatCurrency(Number(fund.amount))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <FundTable funds={funds} canManage={canManage} />
         )}
       </div>
     </div>

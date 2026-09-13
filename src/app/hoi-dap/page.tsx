@@ -1,21 +1,40 @@
-import { MessageSquare } from 'lucide-react'
+import { createClient } from '@/utils/supabase/server'
+import QuestionList from './QuestionList'
 
-export default function HoiDapPage() {
+export default async function HoiDapPage() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  let canManageAll = false
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role === 'admin' || profile?.role === 'gvcn') {
+      canManageAll = true
+    }
+  }
+
+  const { data: questions } = await supabase
+    .from('questions')
+    .select('*, profiles(full_name, role)')
+    .order('created_at', { ascending: false })
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-800">Hỏi đáp</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition text-sm font-medium">
-          + Đặt câu hỏi
-        </button>
+      <div className="border-b pb-4">
+        <h1 className="text-2xl font-bold text-slate-800">Hỏi đáp & Trao đổi</h1>
+        <p className="text-xs text-slate-500 mt-1">Góc thảo luận, thắc mắc bài tập và trao đổi giữa học sinh, phụ huynh và giáo viên</p>
       </div>
-      
-      <div className="space-y-4">
-        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-          <MessageSquare className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-          <p>Chưa có câu hỏi nào. Hãy là người đầu tiên đặt câu hỏi!</p>
-        </div>
-      </div>
+
+      <QuestionList
+        questions={questions || []}
+        currentUserId={user?.id}
+        canManageAll={canManageAll}
+      />
     </div>
   )
 }
