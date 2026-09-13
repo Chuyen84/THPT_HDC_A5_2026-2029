@@ -144,7 +144,13 @@ export async function updateMemberAccount(formData: {
   revalidatePath('/danh-ba')
   revalidatePath('/', 'layout')
 
-  return { success: true }
+  return { 
+    success: true,
+    updatedProfile: {
+      id,
+      ...updateData,
+    }
+  }
 }
 
 // Xoá thành viên khỏi hệ thống

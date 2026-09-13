@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Check,
   X,
@@ -34,6 +35,7 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   parseRoleData,
   getAllUserPermissions,
+  encodeRoleData,
   UserPermissions,
   ModuleKey,
 } from '@/utils/permissions'
@@ -49,6 +51,13 @@ interface Profile {
 }
 
 export default function MemberManagement({ profiles }: { profiles: Profile[] }) {
+  const router = useRouter()
+  const [memberList, setMemberList] = useState<Profile[]>(profiles)
+
+  useEffect(() => {
+    setMemberList(profiles)
+  }, [profiles])
+
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<'all' | 'pending' | 'active'>('all')
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -94,7 +103,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     hoc_sinh: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
   }
 
-  const filtered = profiles.filter((p) => {
+  const filtered = memberList.filter((p) => {
     const term = search.toLowerCase()
     const matchSearch =
       (p.full_name || '').toLowerCase().includes(term) ||
@@ -108,8 +117,11 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
   const handleStatusChange = async (id: string, status: 'active' | 'rejected') => {
     try {
       setLoadingId(id)
+      setMemberList((prev) => prev.map((u) => (u.id === id ? { ...u, status } : u)))
       await updateMemberStatus(id, status)
+      router.refresh()
     } catch (err: any) {
+      router.refresh()
       alert('Lỗi: ' + (err.message || 'Không thể cập nhật'))
     } finally {
       setLoadingId(null)
@@ -120,8 +132,11 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
   const handleRoleChange = async (id: string, newRole: string) => {
     try {
       setLoadingId(id)
+      setMemberList((prev) => prev.map((u) => (u.id === id ? { ...u, role: newRole } : u)))
       await updateMemberRole(id, newRole)
+      router.refresh()
     } catch (err: any) {
+      router.refresh()
       alert('Lỗi: ' + (err.message || 'Không thể cập nhật vai trò'))
     } finally {
       setLoadingId(null)
@@ -227,10 +242,16 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     if (!selectedUserForPerms) return
     setIsSavingPerms(true)
     try {
+      const encodedRole = encodeRoleData(tempBaseRole, tempPerms)
+      setMemberList((prev) =>
+        prev.map((u) => (u.id === selectedUserForPerms.id ? { ...u, role: encodedRole } : u))
+      )
       await updateMemberDetailedPermissions(selectedUserForPerms.id, tempBaseRole, tempPerms)
+      router.refresh()
       alert('Đã cập nhật phân quyền chi tiết cho tài khoản!')
       setSelectedUserForPerms(null)
     } catch (err: any) {
+      router.refresh()
       alert('Lỗi: ' + (err.message || 'Không thể lưu phân quyền'))
     } finally {
       setIsSavingPerms(false)
@@ -245,8 +266,26 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     setEditError('')
 
     try {
+      const encodedRole = encodeRoleData(editRole, editPerms)
+      const targetId = selectedUserForEdit.id
+
+      // Optimistic update
+      setMemberList((prev) =>
+        prev.map((u) =>
+          u.id === targetId
+            ? {
+                ...u,
+                full_name: editFullName.trim(),
+                phone_number: editPhone.trim() || u.phone_number,
+                email: editEmail.trim() || u.email,
+                role: encodedRole,
+              }
+            : u
+        )
+      )
+
       await updateMemberAccount({
-        id: selectedUserForEdit.id,
+        id: targetId,
         fullName: editFullName.trim(),
         phoneNumber: editPhone.trim() || undefined,
         email: editEmail.trim() || undefined,
@@ -254,9 +293,12 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
         customPerms: editPerms,
         newPassword: editPassword.trim() || undefined,
       })
+
+      router.refresh()
       alert('Đã lưu cập nhật tài khoản và phân quyền thành công!')
       setSelectedUserForEdit(null)
     } catch (err: any) {
+      router.refresh()
       setEditError(err.message || 'Không thể cập nhật tài khoản')
     } finally {
       setIsSavingEdit(false)
@@ -268,8 +310,13 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     if (!confirm(`Bạn có chắc chắn muốn xoá tài khoản "${name}" khỏi hệ thống không?`)) return
     try {
       setLoadingId(id)
+      // Optimistic delete
+      setMemberList((prev) => prev.filter((u) => u.id !== id))
       await deleteMember(id)
+      router.refresh()
+      alert('Đã xoá tài khoản thành công!')
     } catch (err: any) {
+      router.refresh()
       alert('Lỗi: ' + (err.message || 'Không thể xoá tài khoản'))
     } finally {
       setLoadingId(null)
@@ -299,6 +346,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
       setFullName('')
       setCustomPassword('')
       setRole('phu_huynh')
+      router.refresh()
     } catch (err: any) {
       setFormError(err.message || 'Đã có lỗi xảy ra khi tạo tài khoản')
     } finally {
@@ -306,8 +354,8 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     }
   }
 
-  const pendingCount = profiles.filter((p) => p.status === 'pending').length
-  const activeCount = profiles.filter((p) => p.status === 'active').length
+  const pendingCount = memberList.filter((p) => p.status === 'pending').length
+  const activeCount = memberList.filter((p) => p.status === 'active').length
 
   return (
     <div className="space-y-4">
@@ -336,7 +384,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                   : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
-              Tất cả ({profiles.length})
+              Tất cả ({memberList.length})
             </button>
             <button
               onClick={() => setTab('pending')}
