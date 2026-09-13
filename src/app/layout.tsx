@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
-import { Home, Bell, Users, DollarSign, Calendar, FileText, CheckSquare, MessageSquare } from 'lucide-react'
+import { Home, Bell, Users, DollarSign, Calendar, FileText, CheckSquare, MessageSquare, GraduationCap } from 'lucide-react'
 
 import { createClient } from '@/utils/supabase/server'
 
@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: '/', icon: Home, label: 'Trang chủ' },
+  { href: '/hoc-sinh', icon: GraduationCap, label: 'Học sinh' },
   { href: '/thong-bao', icon: Bell, label: 'Thông báo' },
   { href: '/danh-ba', icon: Users, label: 'Danh bạ' },
   { href: '/quy-lop', icon: DollarSign, label: 'Quỹ lớp' },
