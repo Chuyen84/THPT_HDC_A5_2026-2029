@@ -1,21 +1,40 @@
-import { CheckSquare } from 'lucide-react'
+import { createClient } from '@/utils/supabase/server'
+import SurveyList from './SurveyList'
 
-export default function KhaoSatPage() {
+export default async function KhaoSatPage() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  let canManage = false
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role === 'admin' || profile?.role === 'gvcn') {
+      canManage = true
+    }
+  }
+
+  const { data: surveys } = await supabase
+    .from('surveys')
+    .select('*, profiles(full_name), survey_options(*)')
+    .order('created_at', { ascending: false })
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b pb-4">
+      <div className="border-b pb-4">
         <h1 className="text-2xl font-bold text-slate-800">Khảo sát & Bình chọn</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition text-sm font-medium">
-          + Tạo khảo sát
-        </button>
+        <p className="text-xs text-slate-500 mt-1">Lấy ý kiến tập thể lớp về các hoạt động, kế hoạch chung</p>
       </div>
-      
-      <div className="space-y-4">
-        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-          <CheckSquare className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-          <p>Không có cuộc khảo sát nào đang diễn ra.</p>
-        </div>
-      </div>
+
+      <SurveyList
+        surveys={surveys || []}
+        canManage={canManage}
+        isLoggedIn={!!user}
+      />
     </div>
   )
 }
