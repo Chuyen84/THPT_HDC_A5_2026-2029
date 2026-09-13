@@ -22,6 +22,7 @@ import {
   School,
   Sun,
   Moon,
+  Phone,
 } from 'lucide-react'
 
 const navItems = [
@@ -39,10 +40,12 @@ const navItems = [
 export default function AppLayoutClient({
   children,
   user,
+  profile,
   isAdminOrGvcn,
 }: {
   children: React.ReactNode
   user: any
+  profile?: any
   isAdminOrGvcn: boolean
 }) {
   const pathname = usePathname()
@@ -74,6 +77,18 @@ export default function AppLayoutClient({
       setIsDark(true)
     }
   }
+
+  // Display user identifier (Phone number or Full name or Email)
+  const displayName = profile?.full_name || profile?.phone_number || (user?.email?.includes('@phhs.a5.local') ? user.email.split('@')[0] : user?.email) || 'Thành viên'
+  const displayPhone = profile?.phone_number || (user?.email?.includes('@phhs.a5.local') ? user.email.split('@')[0] : '')
+
+  const roleLabels: Record<string, string> = {
+    admin: 'Quản trị viên',
+    gvcn: 'GVCN',
+    phu_huynh: 'Phụ huynh',
+    hoc_sinh: 'Học sinh',
+  }
+  const roleText = profile?.role ? (roleLabels[profile.role] || profile.role) : (isAdminOrGvcn ? 'GVCN / Admin' : 'Thành viên')
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100 transition-colors duration-200">
@@ -175,7 +190,7 @@ export default function AppLayoutClient({
           )}
         </div>
 
-        {/* Sidebar Footer: Toggle Theme, Toggle Collapse, Profile */}
+        {/* Sidebar Footer */}
         <div className="p-3 border-t border-white/10 bg-black/20 shrink-0 space-y-2">
           {/* Theme Mode Toggle (Sáng / Tối) in Sidebar */}
           <button
@@ -238,7 +253,7 @@ export default function AppLayoutClient({
               <div className="w-4 h-4 rounded-full bg-cyan-500 text-white flex items-center justify-center text-[10px] shrink-0 font-bold">
                 +
               </div>
-              {!collapsed && <span className="truncate">Đăng nhập</span>}
+              {!collapsed && <span className="truncate">Đăng nhập (SĐT)</span>}
             </Link>
           )}
         </div>
@@ -249,7 +264,6 @@ export default function AppLayoutClient({
         {/* Top Header Bar */}
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs transition-colors duration-200">
           <div className="flex items-center gap-3">
-            {/* Mobile Hamburger toggle */}
             <button
               onClick={() => setMobileOpen(true)}
               className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none"
@@ -265,9 +279,7 @@ export default function AppLayoutClient({
             </div>
           </div>
 
-          {/* Right actions in header */}
           <div className="flex items-center gap-3">
-            {/* Quick theme toggle button in header */}
             <button
               onClick={toggleTheme}
               className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
@@ -281,17 +293,20 @@ export default function AppLayoutClient({
             </button>
 
             {user ? (
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2.5 text-xs">
                 <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 flex items-center justify-center font-bold text-blue-700 dark:text-cyan-400 uppercase">
-                  {user.email ? user.email.slice(0, 2) : 'A5'}
+                  {displayName.slice(0, 2)}
                 </div>
                 <div className="hidden sm:flex flex-col text-left">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
-                    {user.email}
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                    {displayName}
                   </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                    {isAdminOrGvcn ? 'Giáo viên / Quản trị' : 'Thành viên'}
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+                    <span>{roleText}</span>
+                    {displayPhone && (
+                      <span className="font-mono text-slate-400">({displayPhone})</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -299,7 +314,7 @@ export default function AppLayoutClient({
                 href="/login"
                 className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition shadow-2xs"
               >
-                Đăng nhập
+                Đăng nhập SĐT
               </Link>
             )}
           </div>

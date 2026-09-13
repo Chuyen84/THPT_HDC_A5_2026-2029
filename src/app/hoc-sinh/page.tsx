@@ -25,14 +25,19 @@ export default async function HocSinhPage() {
     .order('full_name', { ascending: true })
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-200 dark:border-slate-800 pb-4 transition-colors">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2.5">
-          <GraduationCap className="w-7 h-7 text-blue-600 dark:text-cyan-400" />
-          Danh sách Học sinh
-        </h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Hồ sơ thông tin học sinh Lớp 10A5 - Niên khoá 2026 - 2029 và quản lý phụ huynh liên hệ
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 transition-colors gap-1">
+        <div className="flex items-center gap-2">
+          <GraduationCap className="w-6 h-6 text-blue-600 dark:text-cyan-400 shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white leading-tight">
+            Danh sách Học sinh
+          </h1>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 font-semibold border border-blue-200 dark:border-blue-900/60">
+            Lớp 10A5
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+          Niên khoá 2026 - 2029 • THPT Hoài Đức C
         </p>
       </div>
 

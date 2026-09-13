@@ -22,12 +22,15 @@ export default async function RootLayout({
   } = await supabase.auth.getUser()
 
   let isAdminOrGvcn = false
+  let profile = null
+
   if (user) {
-    const { data: profile } = await supabase
+    const { data: p } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, full_name, phone_number, email')
       .eq('id', user.id)
       .single()
+    profile = p
     if (profile?.role === 'admin' || profile?.role === 'gvcn') {
       isAdminOrGvcn = true
     }
@@ -36,7 +39,7 @@ export default async function RootLayout({
   return (
     <html lang="vi" className="h-full">
       <body className={`${inter.className} h-full antialiased overflow-hidden`}>
-        <AppLayoutClient user={user} isAdminOrGvcn={isAdminOrGvcn}>
+        <AppLayoutClient user={user} profile={profile} isAdminOrGvcn={isAdminOrGvcn}>
           {children}
         </AppLayoutClient>
       </body>
