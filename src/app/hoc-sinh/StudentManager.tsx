@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
@@ -103,6 +103,47 @@ export default function StudentManager({
     XLSX.writeFile(workbook, `Danh_Sach_Hoc_Sinh_Lop_10A5_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
+  // Helper to parse date from string or Excel serial number
+  const parseDateString = (val: any) => {
+    if (!val) return null
+    // If Excel serial number (e.g., 40826)
+    if (typeof val === 'number') {
+      try {
+        const date = new Date(Math.round((val - 25569) * 86400 * 1000))
+        return date.toISOString().split('T')[0]
+      } catch {
+        return null
+      }
+    }
+
+    const str = String(val).trim()
+    if (!str) return null
+
+    // Match YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+
+    // Match DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/)
+    if (dmyMatch) {
+      const d = dmyMatch[1].padStart(2, '0')
+      const m = dmyMatch[2].padStart(2, '0')
+      let y = dmyMatch[3]
+      if (y.length === 2) y = '20' + y
+      return `${y}-${m}-${d}`
+    }
+
+    // Match compact DDMMYYYY (e.g. 14082011) or with extra suffix like 14/08/201114 -> extract 14/08/2011
+    const cleanDigits = str.replace(/[^\d]/g, '')
+    if (cleanDigits.length >= 8) {
+      const d = cleanDigits.slice(0, 2)
+      const m = cleanDigits.slice(2, 4)
+      const y = cleanDigits.slice(4, 8)
+      return `${y}-${m}-${d}`
+    }
+
+    return null
+  }
+
   // Handle Excel File Upload & Parse
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -112,43 +153,132 @@ export default function StudentManager({
     reader.onload = (event) => {
       try {
         const bstr = event.target?.result
-        const workbook = XLSX.read(bstr, { type: 'binary' })
+        const workbook = XLSX.read(bstr, { type: 'binary', cellDates: false })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
 
-        // Map column names flexibly
-        const mapped = rawJson.map((row) => {
-          // Find fields by keys containing common headers
-          const findVal = (keys: string[]) => {
-            const foundKey = Object.keys(row).find((k) =>
-              keys.some((cand) => k.toLowerCase().replace(/\s+/g, '').includes(cand.toLowerCase()))
-            )
-            return foundKey ? String(row[foundKey]).trim() : ''
+        // Parse to raw 2D array of rows
+        const rawSheet: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
+        if (rawSheet.length === 0) {
+          alert('File Excel không có dữ liệu!')
+          return
+        }
+
+        // Tìm dòng tiêu đề (header row) chứa các từ khóa như 'họ tên' hoặc 'stt'
+        let headerRowIndex = 0
+        for (let i = 0; i < Math.min(rawSheet.length, 10); i++) {
+          const rowText = rawSheet[i].map((c) => String(c).toLowerCase().trim()).join(' ')
+          if (rowText.includes('họ tên') || rowText.includes('hoten') || rowText.includes('họ và tên') || (rowText.includes('stt') && rowText.includes('ngày sinh'))) {
+            headerRowIndex = i
+            break
           }
+        }
 
-          const fullName = findVal(['họ tên', 'hoten', 'tên', 'name', 'họvàtên']) || 'Chưa đặt tên'
-          const gender = findVal(['giới tính', 'gioitinh', 'phái', 'gender']) || 'Nam'
-          const dob = findVal(['ngày sinh', 'ngaysinh', 'dob', 'năm sinh'])
-          const address = findVal(['địa chỉ', 'diachi', 'nơi ở', 'address'])
-          const fatherName = findVal(['bố', 'tên bố', 'cha', 'father'])
-          const fatherPhone = findVal(['điện thoại bố', 'đt bố', 'sđt bố', 'phone bố']) || findVal(['điện thoại', 'sđt', 'phone'])
-          const motherName = findVal(['mẹ', 'tên mẹ', 'mother'])
-          const motherPhone = findVal(['điện thoại mẹ', 'đt mẹ', 'sđt mẹ', 'phone mẹ'])
-          const notes = findVal(['ghi chú', 'ghichu', 'note', 'chuyên đề'])
+        const headers = rawSheet[headerRowIndex].map((h: any) => String(h || '').trim())
+        const dataRows = rawSheet.slice(headerRowIndex + 1)
 
-          return {
+        // Ánh xạ thông minh vị trí các cột
+        const colIndexes = {
+          stt: -1,
+          fullName: -1,
+          gender: -1,
+          dob: -1,
+          address: -1,
+          fatherName: -1,
+          fatherPhone: -1,
+          motherName: -1,
+          motherPhone: -1,
+          notes: -1,
+        }
+
+        headers.forEach((h, idx) => {
+          const clean = h.toLowerCase().replace(/[\n\r_]/g, ' ').replace(/\s+/g, ' ')
+          if (clean === 'stt' || clean.startsWith('stt')) {
+            colIndexes.stt = idx
+          } else if (clean.includes('họ tên') || clean.includes('họ và tên') || clean === 'tên') {
+            colIndexes.fullName = idx
+          } else if (clean.includes('giới tính') || clean.includes('nam/nữ') || clean === 'phái') {
+            colIndexes.gender = idx
+          } else if (clean.includes('ngày sinh') || clean.includes('ngaysinh') || clean === 'ns') {
+            colIndexes.dob = idx
+          } else if (clean.includes('địa chỉ') || clean.includes('hộ khẩu') || clean.includes('nơi ở')) {
+            colIndexes.address = idx
+          } else if (clean.includes('điện thoại b') || clean.includes('đt bố') || clean.includes('sđt bố') || clean.includes('sđt cha') || clean.includes('phone b')) {
+            colIndexes.fatherPhone = idx
+          } else if (clean.includes('điện thoại m') || clean.includes('đt mẹ') || clean.includes('sđt mẹ') || clean.includes('phone m')) {
+            colIndexes.motherPhone = idx
+          } else if (clean === 'bố' || clean.includes('họ tên bố') || clean.includes('tên bố') || clean.includes('cha')) {
+            colIndexes.fatherName = idx
+          } else if (clean === 'mẹ' || clean.includes('họ tên mẹ') || clean.includes('tên mẹ')) {
+            colIndexes.motherName = idx
+          } else if (clean.includes('ghi chú') || clean.includes('ghichu') || clean.includes('chuyên đề') || clean.includes('lưu ý')) {
+            colIndexes.notes = idx
+          }
+        })
+
+        // Fallback theo thứ tự cột chuẩn nếu bảng có dạng cột: STT(0), Họ tên(1), Giới tính(2), Ngày sinh(3), Địa chỉ(4), Bố(5), ĐT Bố(6), Mẹ(7), ĐT Mẹ(8), Ghi chú(9)
+        if (colIndexes.fullName === -1 && headers.length >= 2) colIndexes.fullName = 1
+        if (colIndexes.gender === -1 && headers.length >= 3) colIndexes.gender = 2
+        if (colIndexes.dob === -1 && headers.length >= 4) colIndexes.dob = 3
+        if (colIndexes.address === -1 && headers.length >= 5) colIndexes.address = 4
+        if (colIndexes.fatherName === -1 && headers.length >= 6) colIndexes.fatherName = 5
+        if (colIndexes.fatherPhone === -1 && headers.length >= 7) colIndexes.fatherPhone = 6
+        if (colIndexes.motherName === -1 && headers.length >= 8) colIndexes.motherName = 7
+        if (colIndexes.motherPhone === -1 && headers.length >= 9) colIndexes.motherPhone = 8
+        if (colIndexes.notes === -1 && headers.length >= 10) colIndexes.notes = 9
+
+        const getVal = (row: any[], index: number) => {
+          if (index < 0 || index >= row.length) return ''
+          const val = row[index]
+          if (val === null || val === undefined) return ''
+          return String(val).trim()
+        }
+
+        // Format số điện thoại chuẩn (giữ số 0 ở đầu)
+        const formatPhone = (val: any) => {
+          if (!val) return ''
+          let s = String(val).replace(/[\s\.\-]/g, '').trim()
+          if (/^\d{9}$/.test(s)) s = '0' + s
+          return s
+        }
+
+        const mapped: any[] = []
+
+        dataRows.forEach((row) => {
+          const fullName = getVal(row, colIndexes.fullName)
+          // Bỏ qua dòng rỗng hoặc không có tên học sinh
+          if (!fullName || fullName.toLowerCase() === 'họ tên' || fullName.length < 2) return
+
+          const rawGender = getVal(row, colIndexes.gender)
+          const gender = rawGender.toLowerCase().includes('nữ') || rawGender.toLowerCase().includes('nu') ? 'Nữ' : 'Nam'
+
+          const rawDob = row[colIndexes.dob]
+          const dob = parseDateString(rawDob)
+
+          const address = getVal(row, colIndexes.address)
+          const fatherName = getVal(row, colIndexes.fatherName)
+          const fatherPhone = formatPhone(row[colIndexes.fatherPhone])
+          const motherName = getVal(row, colIndexes.motherName)
+          const motherPhone = formatPhone(row[colIndexes.motherPhone])
+          const notes = getVal(row, colIndexes.notes)
+
+          mapped.push({
             full_name: fullName,
-            gender: gender.toLowerCase().includes('nữ') || gender.toLowerCase().includes('nu') ? 'Nữ' : 'Nam',
-            dob: dob ? parseDateString(dob) : null,
+            gender,
+            dob,
             address,
             father_name: fatherName,
             father_phone: fatherPhone,
             mother_name: motherName,
             mother_phone: motherPhone,
             notes,
-          }
+          })
         })
+
+        if (mapped.length === 0) {
+          alert('Không tìm thấy bản ghi học sinh hợp lệ nào trong file!')
+          return
+        }
 
         setPreviewData(mapped)
         setShowImportModal(true)
@@ -158,21 +288,6 @@ export default function StudentManager({
     }
     reader.readAsBinaryString(file)
     e.target.value = ''
-  }
-
-  // Parse various date formats like DD/MM/YYYY
-  const parseDateString = (dateStr: string) => {
-    if (!dateStr) return null
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr
-    const parts = dateStr.split(/[\/\-\.]/)
-    if (parts.length === 3) {
-      const d = parts[0].padStart(2, '0')
-      const m = parts[1].padStart(2, '0')
-      let y = parts[2]
-      if (y.length === 2) y = '20' + y
-      return `${y}-${m}-${d}`
-    }
-    return null
   }
 
   // Execute Batch Import
