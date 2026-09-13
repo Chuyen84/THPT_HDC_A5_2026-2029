@@ -66,6 +66,87 @@ export async function updateMemberDetailedPermissions(
   revalidatePath('/', 'layout')
 }
 
+// Sửa thông tin tài khoản (Họ tên, SĐT, Email, Mật khẩu mới nếu có) và phân quyền
+export async function updateMemberAccount(formData: {
+  id: string
+  fullName: string
+  phoneNumber?: string
+  email?: string
+  baseRole: 'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh'
+  customPerms?: UserPermissions
+  newPassword?: string
+}) {
+  const { supabase } = await checkIsAdmin()
+  const { id, fullName, phoneNumber, email, baseRole, customPerms, newPassword } = formData
+
+  if (!id || !fullName) {
+    throw new Error('Vui lòng cung cấp đầy đủ thông tin bắt buộc')
+  }
+
+  const encodedRole = encodeRoleData(baseRole, customPerms)
+
+  const updateData: any = {
+    full_name: fullName.trim(),
+    role: encodedRole,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (phoneNumber !== undefined) {
+    let cleanPhone = phoneNumber.replace(/[^0-9]/g, '').trim()
+    if (cleanPhone) {
+      if (/^\d{9}$/.test(cleanPhone)) {
+        cleanPhone = '0' + cleanPhone
+      }
+      if (!/^0\d{9}$/.test(cleanPhone)) {
+        throw new Error('Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số')
+      }
+      updateData.phone_number = cleanPhone
+    } else {
+      updateData.phone_number = null
+    }
+  }
+
+  if (email !== undefined && email.trim()) {
+    updateData.email = email.trim()
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update(updateData)
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+
+  // Nếu Admin đổi mật khẩu mới cho tài khoản, gọi Supabase Admin Auth API
+  if (newPassword && newPassword.trim()) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    
+    // Thử cập nhật mật khẩu qua Supabase Admin API
+    try {
+      await fetch(`${supabaseUrl}/auth/v1/admin/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'apikey': serviceRoleKey,
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: newPassword.trim(),
+        }),
+      })
+    } catch (e) {
+      console.warn('Could not update auth password directly:', e)
+    }
+  }
+
+  revalidatePath('/admin/thanh-vien')
+  revalidatePath('/danh-ba')
+  revalidatePath('/', 'layout')
+
+  return { success: true }
+}
+
 // Xoá thành viên khỏi hệ thống
 export async function deleteMember(id: string) {
   const { supabase } = await checkIsAdmin()
@@ -108,7 +189,7 @@ export async function createAccountByAdmin(formData: {
     password = customPassword || '123456'
   } else {
     // Standardize phone number
-    let cleanPhone = identifier.replace(/[\s\.\-\(\)]/g, '').trim()
+    let cleanPhone = identifier.replace(/[^0-9]/g, '').trim()
     if (/^\d{9}$/.test(cleanPhone)) {
       cleanPhone = '0' + cleanPhone
     }

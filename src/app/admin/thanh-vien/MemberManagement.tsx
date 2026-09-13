@@ -4,7 +4,6 @@ import { useState } from 'react'
 import {
   Check,
   X,
-  Shield,
   Search,
   UserCheck,
   Clock,
@@ -12,13 +11,15 @@ import {
   UserPlus,
   Phone,
   Mail,
-  Key,
   Trash2,
-  Lock,
   AlertCircle,
   SlidersHorizontal,
+  Edit3,
+  Eye,
+  PlusCircle,
+  Edit2,
+  Trash,
   CheckCircle2,
-  XCircle,
 } from 'lucide-react'
 import {
   updateMemberStatus,
@@ -26,6 +27,7 @@ import {
   deleteMember,
   createAccountByAdmin,
   updateMemberDetailedPermissions,
+  updateMemberAccount,
 } from './actions'
 import {
   ALL_MODULES,
@@ -66,6 +68,17 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
   const [tempBaseRole, setTempBaseRole] = useState<'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh'>('phu_huynh')
   const [tempPerms, setTempPerms] = useState<UserPermissions>({})
   const [isSavingPerms, setIsSavingPerms] = useState(false)
+
+  // State Modal Chỉnh sửa thông tin tài khoản & phân quyền
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<Profile | null>(null)
+  const [editFullName, setEditFullName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editRole, setEditRole] = useState<'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh'>('phu_huynh')
+  const [editPassword, setEditPassword] = useState('')
+  const [editPerms, setEditPerms] = useState<UserPermissions>({})
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const roleDisplay: Record<string, string> = {
     admin: 'Quản trị viên (Admin)',
@@ -124,19 +137,34 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     setTempPerms(currentAllPerms)
   }
 
-  // Bật/tắt 1 quyền cụ thể (view, add, edit, delete)
+  // Mở modal sửa thông tin tài khoản & phân quyền
+  const handleOpenEditModal = (user: Profile) => {
+    const isInternalPhoneAccount = user.email?.includes('@phhs.a5.local')
+    const phone = user.phone_number || (isInternalPhoneAccount ? user.email.split('@')[0] : '')
+    const roleData = parseRoleData(user.role)
+    const currentPerms = getAllUserPermissions(user.role)
+
+    setSelectedUserForEdit(user)
+    setEditFullName(user.full_name || '')
+    setEditPhone(phone)
+    setEditEmail(isInternalPhoneAccount ? '' : user.email)
+    setEditRole(roleData.baseRole)
+    setEditPassword('')
+    setEditPerms(currentPerms)
+    setEditError('')
+  }
+
+  // Bật/tắt 1 quyền cụ thể (view, add, edit, delete) trong modal phân quyền
   const handleTogglePerm = (modKey: ModuleKey, action: 'view' | 'add' | 'edit' | 'delete') => {
     setTempPerms((prev) => {
       const currentMod = prev[modKey] || { view: false, add: false, edit: false, delete: false }
       const nextVal = !currentMod[action]
       const updatedMod = { ...currentMod, [action]: nextVal }
-      // Nếu tắt 'view' thì cũng tắt add, edit, delete
       if (action === 'view' && !nextVal) {
         updatedMod.add = false
         updatedMod.edit = false
         updatedMod.delete = false
       }
-      // Nếu bật add/edit/delete mà view chưa bật thì tự động bật view
       if (action !== 'view' && nextVal) {
         updatedMod.view = true
       }
@@ -147,7 +175,27 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     })
   }
 
-  // Chọn toàn bộ quyền hoặc bỏ chọn toàn bộ quyền cho 1 module
+  // Bật/tắt quyền trong modal Edit Account
+  const handleToggleEditPerm = (modKey: ModuleKey, action: 'view' | 'add' | 'edit' | 'delete') => {
+    setEditPerms((prev) => {
+      const currentMod = prev[modKey] || { view: false, add: false, edit: false, delete: false }
+      const nextVal = !currentMod[action]
+      const updatedMod = { ...currentMod, [action]: nextVal }
+      if (action === 'view' && !nextVal) {
+        updatedMod.add = false
+        updatedMod.edit = false
+        updatedMod.delete = false
+      }
+      if (action !== 'view' && nextVal) {
+        updatedMod.view = true
+      }
+      return {
+        ...prev,
+        [modKey]: updatedMod,
+      }
+    })
+  }
+
   const handleToggleAllForModule = (modKey: ModuleKey) => {
     setTempPerms((prev) => {
       const cur = prev[modKey] || { view: false, add: false, edit: false, delete: false }
@@ -164,10 +212,14 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     })
   }
 
-  // Áp dụng quyền theo mẫu mặc định của một vai trò
   const handleApplyRolePreset = (presetRole: 'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh') => {
     setTempBaseRole(presetRole)
     setTempPerms(JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS[presetRole])))
+  }
+
+  const handleApplyEditRolePreset = (presetRole: 'admin' | 'gvcn' | 'phu_huynh' | 'hoc_sinh') => {
+    setEditRole(presetRole)
+    setEditPerms(JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS[presetRole])))
   }
 
   // Lưu phân quyền chi tiết
@@ -182,6 +234,32 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
       alert('Lỗi: ' + (err.message || 'Không thể lưu phân quyền'))
     } finally {
       setIsSavingPerms(false)
+    }
+  }
+
+  // Lưu chỉnh sửa tài khoản & phân quyền
+  const handleSaveAccountEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUserForEdit) return
+    setIsSavingEdit(true)
+    setEditError('')
+
+    try {
+      await updateMemberAccount({
+        id: selectedUserForEdit.id,
+        fullName: editFullName.trim(),
+        phoneNumber: editPhone.trim() || undefined,
+        email: editEmail.trim() || undefined,
+        baseRole: editRole,
+        customPerms: editPerms,
+        newPassword: editPassword.trim() || undefined,
+      })
+      alert('Đã lưu cập nhật tài khoản và phân quyền thành công!')
+      setSelectedUserForEdit(null)
+    } catch (err: any) {
+      setEditError(err.message || 'Không thể cập nhật tài khoản')
+    } finally {
+      setIsSavingEdit(false)
     }
   }
 
@@ -301,17 +379,20 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
         <table className="w-full text-left text-xs sm:text-sm border-collapse">
           <thead className="bg-[#bfe6f7]/70 dark:bg-[#103459]/80 text-slate-900 dark:text-cyan-100 font-bold border-b border-blue-200 dark:border-blue-900/60">
             <tr>
-              <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40">Họ tên & Tài khoản đăng nhập</th>
-              <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 min-w-[190px]">Phân quyền vai trò & Menu</th>
-              <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 text-center w-28">Trạng thái</th>
-              <th className="p-3.5 border-r border-blue-200 dark:border-blue-900/40 text-center w-28 whitespace-nowrap">Ngày tạo</th>
-              <th className="p-3.5 text-right whitespace-nowrap w-40">Thao tác</th>
+              <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[180px]">Họ tên & Tài khoản</th>
+              <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 w-44">Vai trò cơ sở</th>
+              <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 min-w-[320px]">
+                Checklist phân hệ Menu (Xem / Sửa / Xoá)
+              </th>
+              <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 text-center w-24">Trạng thái</th>
+              <th className="p-3 border-r border-blue-200 dark:border-blue-900/40 text-center w-24 whitespace-nowrap">Ngày tạo</th>
+              <th className="p-3 text-right whitespace-nowrap w-36">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={6} className="p-10 text-center text-slate-400 dark:text-slate-500">
                   Không có thành viên nào trong danh sách.
                 </td>
               </tr>
@@ -320,16 +401,20 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                 const isPending = user.status === 'pending'
                 const isActive = user.status === 'active'
 
-                // Display identifier (Phone number or Email)
                 const isInternalPhoneAccount = user.email?.includes('@phhs.a5.local')
                 const displayPhone = user.phone_number || (isInternalPhoneAccount ? user.email.split('@')[0] : null)
 
                 const roleData = parseRoleData(user.role)
                 const isCustomized = Boolean(roleData.customPerms && Object.keys(roleData.customPerms).length > 0)
+                const userPerms = getAllUserPermissions(user.role)
+
+                // Đếm tổng số menu được xem
+                const visibleCount = ALL_MODULES.filter((m) => userPerms[m.key]?.view).length
 
                 return (
                   <tr key={user.id} className="hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition">
-                    <td className="p-3.5 border-r border-slate-100 dark:border-slate-800">
+                    {/* Họ tên & Tài khoản */}
+                    <td className="p-3 border-r border-slate-100 dark:border-slate-800">
                       <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                         {user.full_name || 'Chưa đặt tên'}
                       </div>
@@ -346,86 +431,146 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                       </div>
                     </td>
 
-                    <td className="p-3.5 border-r border-slate-100 dark:border-slate-800">
+                    {/* Vai trò */}
+                    <td className="p-3 border-r border-slate-100 dark:border-slate-800">
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={roleData.baseRole}
-                            disabled={loadingId === user.id}
-                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                            className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer ${
-                              roleBadgeStyle[roleData.baseRole] || 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}
-                          >
-                            <option value="hoc_sinh">Học sinh</option>
-                            <option value="phu_huynh">Phụ huynh</option>
-                            <option value="gvcn">GV Chủ nhiệm</option>
-                            <option value="admin">Quản trị viên (Admin)</option>
-                          </select>
-
-                          {/* Nút mở popup phân quyền chi tiết */}
-                          <button
-                            onClick={() => handleOpenPermsModal(user)}
-                            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border font-medium transition ${
-                              isCustomized
-                                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 shadow-2xs'
-                                : 'bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}
-                            title="Tùy biến quyền xem, sửa, xoá, thêm từng menu"
-                          >
-                            <SlidersHorizontal className="w-3 h-3 text-blue-600 dark:text-cyan-400" />
-                            <span>{isCustomized ? 'Quyền tuỳ biến' : 'Phân quyền menu'}</span>
-                          </button>
+                        <select
+                          value={roleData.baseRole}
+                          disabled={loadingId === user.id}
+                          onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-xl border focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer ${
+                            roleBadgeStyle[roleData.baseRole] || 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <option value="hoc_sinh">Học sinh</option>
+                          <option value="phu_huynh">Phụ huynh</option>
+                          <option value="gvcn">GV Chủ nhiệm</option>
+                          <option value="admin">Quản trị viên (Admin)</option>
+                        </select>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          {isCustomized ? (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium">● Đã tuỳ biến quyền</span>
+                          ) : (
+                            <span className="text-slate-400">Theo vai trò chuẩn</span>
+                          )}
                         </div>
                       </div>
                     </td>
 
-                    <td className="p-3.5 border-r border-slate-100 dark:border-slate-800 text-center">
+                    {/* Cột CHECKLIST CÁC MỤC, PHÂN HỆ MENU ĐƯỢC PHÂN QUYỀN XEM, SỬA, XOÁ */}
+                    <td className="p-3 border-r border-slate-100 dark:border-slate-800">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pb-1 border-b border-slate-100 dark:border-slate-800">
+                          <span>Được xem: <strong>{visibleCount}/{ALL_MODULES.length}</strong> menu</span>
+                          <button
+                            onClick={() => handleOpenPermsModal(user)}
+                            className="text-blue-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1 font-medium"
+                          >
+                            <SlidersHorizontal className="w-3 h-3" /> Chỉnh sửa quyền
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                          {ALL_MODULES.map((mod) => {
+                            const p = userPerms[mod.key] || { view: false, add: false, edit: false, delete: false }
+                            return (
+                              <div
+                                key={mod.key}
+                                className={`p-1.5 rounded-lg border text-[11px] flex items-center justify-between gap-1 transition ${
+                                  p.view
+                                    ? 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/60 text-slate-800 dark:text-slate-200'
+                                    : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600 opacity-60'
+                                }`}
+                              >
+                                <span className="font-semibold truncate" title={mod.label}>
+                                  {mod.label}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {p.view ? (
+                                    <span className="px-1 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold" title="Được xem">
+                                      Xem
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] text-slate-400">Ẩn</span>
+                                  )}
+                                  {p.edit && (
+                                    <span className="px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[9px] font-bold" title="Được sửa">
+                                      Sửa
+                                    </span>
+                                  )}
+                                  {p.delete && (
+                                    <span className="px-1 py-0.2 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-[9px] font-bold" title="Được xoá">
+                                      Xoá
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Trạng thái */}
+                    <td className="p-3 border-r border-slate-100 dark:border-slate-800 text-center">
                       {isPending && (
-                        <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                           <Clock className="w-3 h-3" /> Chờ duyệt
                         </span>
                       )}
                       {isActive && (
-                        <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           <UserCheck className="w-3 h-3" /> Hoạt động
                         </span>
                       )}
                       {user.status === 'rejected' && (
-                        <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                           <UserX className="w-3 h-3" /> Đã khoá
                         </span>
                       )}
                     </td>
 
-                    <td className="p-3.5 border-r border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                    {/* Ngày tạo */}
+                    <td className="p-3 border-r border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                       {new Date(user.created_at).toLocaleDateString('vi-VN')}
                     </td>
 
-                    <td className="p-3.5 text-right whitespace-nowrap">
+                    {/* Thao tác */}
+                    <td className="p-3 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5">
+                        {/* Nút sửa tài khoản & phân quyền */}
+                        <button
+                          onClick={() => handleOpenEditModal(user)}
+                          disabled={loadingId === user.id}
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition font-medium"
+                          title="Sửa thông tin tài khoản & phân quyền"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Sửa</span>
+                        </button>
+
                         {isPending ? (
                           <>
                             <button
                               onClick={() => handleStatusChange(user.id, 'active')}
                               disabled={loadingId === user.id}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition"
                             >
                               <Check className="w-3.5 h-3.5" /> Duyệt
                             </button>
                             <button
                               onClick={() => handleStatusChange(user.id, 'rejected')}
                               disabled={loadingId === user.id}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-medium transition"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-slate-800 hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-lg text-xs font-medium transition"
                             >
-                              <X className="w-3.5 h-3.5" /> Từ chối
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </>
                         ) : isActive ? (
                           <button
                             onClick={() => handleStatusChange(user.id, 'rejected')}
                             disabled={loadingId === user.id}
-                            className="text-xs px-2.5 py-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition border border-transparent hover:border-rose-200"
+                            className="text-xs px-2 py-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
                           >
                             Khoá
                           </button>
@@ -433,9 +578,9 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                           <button
                             onClick={() => handleStatusChange(user.id, 'active')}
                             disabled={loadingId === user.id}
-                            className="text-xs px-2.5 py-1 rounded-lg text-blue-600 dark:text-cyan-400 hover:bg-blue-50 dark:hover:bg-slate-800 transition"
+                            className="text-xs px-2 py-1 rounded-lg text-blue-600 dark:text-cyan-400 hover:bg-blue-50 transition"
                           >
-                            Mở khoá
+                            Mở
                           </button>
                         )}
 
@@ -443,7 +588,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                         <button
                           onClick={() => handleDelete(user.id, user.full_name || user.email)}
                           disabled={loadingId === user.id}
-                          className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition"
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                           title="Xoá tài khoản"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -458,7 +603,226 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
         </table>
       </div>
 
-      {/* MODAL PHÂN QUYỀN MENU CHI TIẾT (XEM, THÊM, SỬA, XOÁ) */}
+      {/* MODAL SỬA TÀI KHOẢN VÀ PHÂN QUYỀN */}
+      {selectedUserForEdit && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-cyan-400">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 dark:text-white">
+                    Sửa tài khoản & Cập nhật phân quyền
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Hiệu chỉnh thông tin đăng nhập, vai trò và checklist quyền xem, sửa, xoá theo menu
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUserForEdit(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 text-xs border border-rose-200 font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAccountEdit} className="flex-1 overflow-y-auto space-y-4 mt-3 text-xs pr-1">
+              {/* Thông tin cơ bản */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Họ và tên <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Số điện thoại đăng nhập
+                  </label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="VD: 0912345678"
+                    className="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Địa chỉ Email (tuỳ chọn)
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="VD: email@gmail.com"
+                    className="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Đổi mật khẩu mới (bỏ trống nếu không đổi)
+                  </label>
+                  <input
+                    type="text"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="Nhập mật khẩu mới..."
+                    className="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Vai trò cơ sở */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">
+                    Vai trò cơ sở (Role)
+                  </label>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleApplyEditRolePreset('admin')}
+                      className="text-[10px] px-2 py-0.5 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium"
+                    >
+                      Mẫu Admin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyEditRolePreset('gvcn')}
+                      className="text-[10px] px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-medium"
+                    >
+                      Mẫu GVCN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyEditRolePreset('phu_huynh')}
+                      className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium"
+                    >
+                      Mẫu Phụ huynh
+                    </button>
+                  </div>
+                </div>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as any)}
+                  className="w-full px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold cursor-pointer"
+                >
+                  <option value="admin">Quản trị viên (Admin)</option>
+                  <option value="gvcn">Giáo viên chủ nhiệm (GVCN)</option>
+                  <option value="phu_huynh">Phụ huynh</option>
+                  <option value="hoc_sinh">Học sinh</option>
+                </select>
+              </div>
+
+              {/* Checklist Phân hệ menu: Xem, Sửa, Xoá, Thêm */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Checklist phân quyền các mục, phân hệ menu:
+                </label>
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
+                      <tr>
+                        <th className="p-2">Phân hệ Menu</th>
+                        <th className="p-2 text-center w-16">Xem</th>
+                        <th className="p-2 text-center w-16">Thêm</th>
+                        <th className="p-2 text-center w-16">Sửa</th>
+                        <th className="p-2 text-center w-16">Xoá</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {ALL_MODULES.map((mod) => {
+                        const perm = editPerms[mod.key] || { view: false, add: false, edit: false, delete: false }
+                        return (
+                          <tr key={mod.key} className="hover:bg-blue-50/30 dark:hover:bg-blue-950/20">
+                            <td className="p-2 font-medium text-slate-800 dark:text-slate-200">
+                              {mod.label}
+                            </td>
+                            <td className="p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={perm.view}
+                                onChange={() => handleToggleEditPerm(mod.key, 'view')}
+                                className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={perm.add}
+                                onChange={() => handleToggleEditPerm(mod.key, 'add')}
+                                className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={perm.edit}
+                                onChange={() => handleToggleEditPerm(mod.key, 'edit')}
+                                className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={perm.delete}
+                                onChange={() => handleToggleEditPerm(mod.key, 'delete')}
+                                className="w-4 h-4 text-rose-600 rounded cursor-pointer accent-rose-600"
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserForEdit(null)}
+                  className="px-4 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-sm flex items-center gap-1.5"
+                >
+                  {isSavingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PHÂN QUYỀN MENU CHI TIẾT NHANH */}
       {selectedUserForPerms && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
@@ -496,28 +860,28 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                 <button
                   type="button"
                   onClick={() => handleApplyRolePreset('admin')}
-                  className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 transition font-medium"
+                  className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition font-medium"
                 >
                   Admin (Toàn quyền)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyRolePreset('gvcn')}
-                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900 text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-blue-800 transition font-medium"
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition font-medium"
                 >
                   GVCN
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyRolePreset('phu_huynh')}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition font-medium"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition font-medium"
                 >
                   Phụ huynh
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyRolePreset('hoc_sinh')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition font-medium"
+                  className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300 transition font-medium"
                 >
                   Học sinh
                 </button>
