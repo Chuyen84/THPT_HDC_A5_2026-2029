@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Bell, Calendar, DollarSign, Activity, ChevronRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { Bell, Calendar, DollarSign, Activity, ChevronRight, CheckCircle2, Clock, AlertCircle, Wallet, FileText, MessageSquare, CalendarDays } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/vi'
@@ -22,6 +22,8 @@ export default function Dashboard() {
     readRate: 85 // Mocked since announcement_reads table is missing
   })
   
+  const [role, setRole] = useState('')
+  const [pendingOcr, setPendingOcr] = useState(0)
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [chartData, setChartData] = useState<any[]>([])
@@ -81,12 +83,26 @@ export default function Dashboard() {
           .order('event_date', { ascending: true })
         
         const next7EventsCount = upEvents?.filter(e => dayjs(e.event_date).isBefore(next7Days)).length || 0
+        const upcomingCount = next7EventsCount
+
+        // 4. Fetch Role & OCR Queue
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          if (profile) {
+            setRole(profile.role)
+            if (profile.role.includes('admin') || profile.role.includes('gvcn')) {
+              const { count } = await supabase.from('ocr_import_queue').select('*', { count: 'exact', head: true }).eq('status', 'cho_duyet')
+              setPendingOcr(count || 0)
+            }
+          }
+        }
 
         setMetrics({
           balance: total,
           newAnnouncements: newAnnsCount,
-          upcomingEvents: next7EventsCount,
-          readRate: 85 // Mocked
+          upcomingEvents: upcomingCount,
+          readRate: 85 // Mock
         })
         setChartData(formattedChart)
         setAnnouncements(recentAnns?.slice(0, 3) || [])
@@ -147,13 +163,34 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 2. Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Số dư quỹ lớp */}
+      {/* 1. Thao tác nhanh (Quick Actions) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link href="/quy-lop/tao-moi" className="flex flex-col items-center justify-center p-4 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-2xl shadow-sm border border-slate-100 transition-colors group">
+          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mb-2 group-hover:scale-110 transition-transform"><Wallet className="w-6 h-6" /></div>
+          <span className="font-semibold text-sm">Nộp quỹ</span>
+        </Link>
+        <Link href="/thoi-khoa-bieu" className="flex flex-col items-center justify-center p-4 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-2xl shadow-sm border border-slate-100 transition-colors group">
+          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mb-2 group-hover:scale-110 transition-transform"><CalendarDays className="w-6 h-6" /></div>
+          <span className="font-semibold text-sm">Lịch học</span>
+        </Link>
+        <Link href="/tai-lieu" className="flex flex-col items-center justify-center p-4 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 rounded-2xl shadow-sm border border-slate-100 transition-colors group">
+          <div className="p-3 bg-amber-100 text-amber-600 rounded-xl mb-2 group-hover:scale-110 transition-transform"><FileText className="w-6 h-6" /></div>
+          <span className="font-semibold text-sm">Tài liệu</span>
+        </Link>
+        <Link href="/gop-y" className="flex flex-col items-center justify-center p-4 bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 rounded-2xl shadow-sm border border-slate-100 transition-colors group">
+          <div className="p-3 bg-purple-100 text-purple-600 rounded-xl mb-2 group-hover:scale-110 transition-transform"><MessageSquare className="w-6 h-6" /></div>
+          <span className="font-semibold text-sm">Góp ý</span>
+        </Link>
+      </div>
+
+      {/* 2. Thống kê nhanh (Stats) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        
+        {/* Số dư hiện tại */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2.5 bg-green-50 text-[#16A34A] rounded-xl"><DollarSign className="w-5 h-5" /></div>
-            <h3 className="text-sm font-semibold text-slate-600">Số dư quỹ lớp</h3>
+            <div className="p-2.5 bg-emerald-50 text-[#16A34A] rounded-xl"><Wallet className="w-5 h-5" /></div>
+            <h3 className="text-sm font-semibold text-slate-600">Số dư hiện tại</h3>
           </div>
           <div className="text-xl md:text-2xl font-bold text-slate-800">{formatCurrency(metrics.balance)}</div>
         </div>
@@ -162,7 +199,7 @@ export default function Dashboard() {
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 bg-blue-50 text-[#1E40AF] rounded-xl"><Bell className="w-5 h-5" /></div>
-            <h3 className="text-sm font-semibold text-slate-600">Thông báo mới (7 ngày)</h3>
+            <h3 className="text-sm font-semibold text-slate-600">Thông báo (7 ngày)</h3>
           </div>
           <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.newAnnouncements} <span className="text-sm font-normal text-slate-500">tin</span></div>
         </div>
@@ -171,22 +208,32 @@ export default function Dashboard() {
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 bg-amber-50 text-[#F59E0B] rounded-xl"><Calendar className="w-5 h-5" /></div>
-            <h3 className="text-sm font-semibold text-slate-600">Sự kiện (7 ngày tới)</h3>
+            <h3 className="text-sm font-semibold text-slate-600">Sự kiện (7 ngày)</h3>
           </div>
           <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.upcomingEvents} <span className="text-sm font-normal text-slate-500">sự kiện</span></div>
         </div>
 
-        {/* Tỷ lệ đã đọc */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl"><Activity className="w-5 h-5" /></div>
-            <h3 className="text-sm font-semibold text-slate-600">Tỷ lệ xem thông báo</h3>
+        {/* Thẻ thứ 4: Chờ duyệt OCR hoặc Tỷ lệ đọc */}
+        {(role.includes('admin') || role.includes('gvcn')) ? (
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between group cursor-pointer hover:border-red-200 transition-colors">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 bg-red-50 text-red-600 rounded-xl group-hover:bg-red-100 transition-colors"><FileText className="w-5 h-5" /></div>
+              <h3 className="text-sm font-semibold text-slate-600">Chờ duyệt (OCR)</h3>
+            </div>
+            <div className="text-xl md:text-2xl font-bold text-red-600">{pendingOcr} <span className="text-sm font-normal text-slate-500">hóa đơn</span></div>
           </div>
-          <div className="flex items-end gap-2">
-            <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.readRate}%</div>
-            <div className="text-xs text-[#16A34A] font-medium mb-1">+5% so với tuần trước</div>
+        ) : (
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl"><Activity className="w-5 h-5" /></div>
+              <h3 className="text-sm font-semibold text-slate-600">Tỷ lệ xem thông báo</h3>
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.readRate}%</div>
+              <div className="text-xs text-[#16A34A] font-medium mb-1">+5% so với tuần trước</div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 3. Main Content Split */}
