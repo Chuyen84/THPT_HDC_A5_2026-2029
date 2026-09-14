@@ -13,13 +13,16 @@ export async function submitFund(formData: FormData) {
   const type = formData.get('type') as string
   const title = formData.get('title') as string
   const amount = Number(formData.get('amount'))
-  const transaction_date = formData.get('transaction_date') as string
+  const category = formData.get('category') as string || null
+  const receiver = formData.get('receiver') as string || null
 
   const { error } = await supabase.from('funds').insert({
     type,
     title,
     amount,
     transaction_date,
+    category,
+    receiver,
     created_by: user.id
   })
 
