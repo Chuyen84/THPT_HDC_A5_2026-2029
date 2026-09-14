@@ -49,6 +49,15 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
+      {/* 0. School Logo/Header Image */}
+      <div className="flex justify-center bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
+        <img 
+          src="/school-banner.png" 
+          alt="Trường THPT Hoài Đức C" 
+          className="h-16 md:h-24 object-contain"
+        />
+      </div>
+
       {/* 1. Welcome Banner */}
       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 opacity-20">
