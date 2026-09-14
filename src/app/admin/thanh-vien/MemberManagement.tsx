@@ -1170,7 +1170,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                   </label>
                   {addAccountType === 'phone' && identifier && (
                     <span className="text-[11px] text-blue-600 dark:text-cyan-400">
-                      Mặc định: {identifier.replace(/[^\d]/g, '')}_phhs
+                      Mặc định: 123456
                     </span>
                   )}
                 </div>
@@ -1178,11 +1178,7 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
                   type="text"
                   value={customPassword}
                   onChange={(e) => setCustomPassword(e.target.value)}
-                  placeholder={
-                    addAccountType === 'phone'
-                      ? `Để trống sẽ lấy mặc định: ${identifier ? identifier.replace(/[^\d]/g, '') + '_phhs' : '<sdt>_phhs'}`
-                      : 'Để trống sẽ lấy mặc định: 123456'
-                  }
+                  placeholder="Để trống sẽ lấy mặc định: 123456"
                   className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                 />
               </div>

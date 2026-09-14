@@ -233,7 +233,7 @@ export async function createAccountByAdmin(formData: {
     }
     phoneNumber = cleanPhone
     email = `${cleanPhone}@phhs.a5.local`
-    password = customPassword || `${cleanPhone}_phhs`
+    password = customPassword || `123456`
   }
 
   const encodedRole = encodeRoleData(role, customPerms)
