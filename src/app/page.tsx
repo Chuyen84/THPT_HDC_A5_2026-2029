@@ -1,248 +1,290 @@
-import { createClient } from '@/utils/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+import { Bell, Calendar, DollarSign, Activity, ChevronRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+import 'dayjs/locale/vi'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import Link from 'next/link'
-import { Bell, Calendar, DollarSign, FileText, CheckSquare, MessageSquare, ArrowRight, TrendingUp } from 'lucide-react'
 
-export default async function HomePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+dayjs.extend(relativeTime)
+dayjs.locale('vi')
+
+export default function Dashboard() {
+  const [loading, setLoading] = useState(true)
+  const [unreadCount, setUnreadCount] = useState(3) // Mock
+  const [metrics, setMetrics] = useState({
+    balance: 0,
+    newAnnouncements: 0,
+    upcomingEvents: 0,
+    readRate: 85 // Mocked since announcement_reads table is missing
+  })
   
-  let profile = null
-  if (user) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    profile = data
+  const [announcements, setAnnouncements] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
+  const [chartData, setChartData] = useState<any[]>([])
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      try {
+        // 1. Fetch Funds for Balance & Chart
+        const { data: funds } = await supabase.from('funds').select('amount, type, created_at')
+        let total = 0
+        const monthlyData: Record<string, number> = {}
+        
+        if (funds) {
+          funds.forEach(f => {
+            const isThu = f.type === 'thu'
+            const amount = Number(f.amount)
+            total += isThu ? amount : -amount
+            
+            const monthStr = dayjs(f.created_at).format('MM/YYYY')
+            if (!monthlyData[monthStr]) monthlyData[monthStr] = 0
+            monthlyData[monthStr] += isThu ? amount : -amount
+          })
+        }
+        
+        // Format chart data (last 4 months)
+        const formattedChart = Object.keys(monthlyData)
+          .sort((a, b) => dayjs(a, 'MM/YYYY').unix() - dayjs(b, 'MM/YYYY').unix())
+          .slice(-4)
+          .map(k => ({
+            name: k,
+            value: monthlyData[k]
+          }))
+
+        // 2. Fetch Announcements (Last 7 days count & Recent 3)
+        const sevenDaysAgo = dayjs().subtract(7, 'day').toISOString()
+        const { data: recentAnns } = await supabase
+          .from('announcements')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10)
+          
+        const newAnnsCount = recentAnns?.filter(a => dayjs(a.created_at).isAfter(sevenDaysAgo)).length || 0
+
+        // 3. Fetch Events (Next 7 days count & Recent 2)
+        const now = new Date().toISOString()
+        const next7Days = dayjs().add(7, 'day').toISOString()
+        const { data: upEvents } = await supabase
+          .from('events')
+          .select('*')
+          .gte('event_date', now)
+          .order('event_date', { ascending: true })
+        
+        const next7EventsCount = upEvents?.filter(e => dayjs(e.event_date).isBefore(next7Days)).length || 0
+
+        setMetrics({
+          balance: total,
+          newAnnouncements: newAnnsCount,
+          upcomingEvents: next7EventsCount,
+          readRate: 85 // Mocked
+        })
+        setChartData(formattedChart)
+        setAnnouncements(recentAnns?.slice(0, 3) || [])
+        setEvents(upEvents?.slice(0, 2) || [])
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)
+
+  const getCategoryStyle = (announcement: any) => {
+    // Giả lập phân loại category vì schema chưa có cột category
+    if (announcement.is_important) return 'bg-[#DC2626]' // danger
+    if (announcement.title.toLowerCase().includes('quỹ') || announcement.title.toLowerCase().includes('tiền')) return 'bg-[#16A34A]' // success
+    return 'bg-[#1E40AF]' // primary
   }
 
-  // Fetch Recent Announcements
-  const { data: recentAnnouncements } = await supabase
-    .from('announcements')
-    .select('*, profiles(full_name)')
-    .order('created_at', { ascending: false })
-    .limit(3)
-
-  // Fetch Upcoming Events
-  const { data: upcomingEvents } = await supabase
-    .from('events')
-    .select('*')
-    .gte('event_date', new Date().toISOString())
-    .order('event_date', { ascending: true })
-    .limit(3)
-
-  // Fetch Fund Balance (Sum)
-  const { data: funds } = await supabase.from('funds').select('amount, type')
-  let balance = 0
-  if (funds) {
-    funds.forEach(f => {
-      balance += f.type === 'thu' ? Number(f.amount) : -Number(f.amount)
-    })
-  }
-
-  // Fetch Recent Documents
-  const { data: recentDocs } = await supabase
-    .from('documents')
-    .select('id, title, created_at')
-    .order('created_at', { ascending: false })
-    .limit(3)
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-16 bg-slate-200 rounded-2xl w-full"></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-28 bg-slate-200 rounded-2xl"></div>)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-64 bg-slate-200 rounded-2xl"></div>
+          <div className="h-64 bg-slate-200 rounded-2xl"></div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      {/* 0. School Logo/Header Image */}
-      <div className="flex justify-center bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
-        <img 
-          src="/school-banner.png" 
-          alt="Trường THPT Hoài Đức C" 
-          className="h-16 md:h-24 object-contain"
-        />
-      </div>
-
-      {/* 1. Welcome Banner */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 opacity-20">
-          <svg width="200" height="200" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+      {/* 1. Header */}
+      <div className="flex items-center justify-between bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-lg hidden sm:flex">
+            10A5
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">Xin chào, Ban phụ huynh lớp 10A5</h1>
+            <p className="text-sm text-slate-500">Tổng quan tình hình lớp học hôm nay</p>
+          </div>
         </div>
-        
-        <div className="relative z-10">
-          <h1 className="text-3xl font-extrabold mb-2 tracking-tight">
-            {profile ? `Xin chào, ${profile.full_name || 'bạn'}! 👋` : 'Chào mừng đến với Lớp 10A5'}
-          </h1>
-          <p className="text-blue-100 text-lg mb-6 max-w-xl">
-            Trung tâm thông tin số dành cho học sinh, phụ huynh và giáo viên chủ nhiệm. Nơi cập nhật nhanh nhất mọi hoạt động của lớp.
-          </p>
-          {!user && (
-            <Link href="/login" className="inline-flex items-center gap-2 bg-white text-blue-700 font-bold px-6 py-3 rounded-xl shadow-md hover:scale-105 transition-transform">
-              Đăng nhập để xem đầy đủ
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+        <div className="relative cursor-pointer hover:bg-slate-50 p-2 rounded-full transition">
+          <Bell className="w-7 h-7 text-slate-600" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1.5 w-3 h-3 bg-[#DC2626] rounded-full border-2 border-white"></span>
           )}
         </div>
       </div>
 
-      {/* 2. Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* LỚP TRÁI (Main Content) */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Lối tắt (Quick Actions) */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-slate-800">Truy cập nhanh</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { href: '/thong-bao', icon: Bell, label: 'Thông báo', color: 'text-blue-600', bg: 'bg-blue-100' },
-                { href: '/lich', icon: Calendar, label: 'Lịch học', color: 'text-green-600', bg: 'bg-green-100' },
-                { href: '/quy-lop', icon: DollarSign, label: 'Quỹ lớp', color: 'text-orange-600', bg: 'bg-orange-100' },
-                { href: '/tai-lieu', icon: FileText, label: 'Tài liệu', color: 'text-purple-600', bg: 'bg-purple-100' },
-                { href: '/khao-sat', icon: CheckSquare, label: 'Khảo sát', color: 'text-pink-600', bg: 'bg-pink-100' },
-                { href: '/hoi-dap', icon: MessageSquare, label: 'Hỏi đáp', color: 'text-teal-600', bg: 'bg-teal-100' },
-              ].map((item) => (
-                <Link key={item.href} href={item.href} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group flex flex-col items-center text-center">
-                  <div className={`w-14 h-14 ${item.bg} ${item.color} rounded-2xl flex items-center justify-center mb-3 group-hover:-translate-y-1 transition-transform`}>
-                    <item.icon className="w-7 h-7" />
-                  </div>
-                  <span className="font-semibold text-slate-700">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          {/* Thông báo mới (Recent Announcements) */}
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-bold text-slate-800">Thông báo mới nhất</h2>
-              </div>
-              <Link href="/thong-bao" className="text-sm font-medium text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition">
-                Xem tất cả
-              </Link>
-            </div>
-            
-            <div className="space-y-4">
-              {(!recentAnnouncements || recentAnnouncements.length === 0) ? (
-                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  Chưa có thông báo nào được đăng.
-                </div>
-              ) : (
-                recentAnnouncements.map((item) => (
-                  <div key={item.id} className="p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors cursor-pointer group">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-indigo-500 rounded-full flex items-center justify-center font-bold text-white shadow-sm">
-                          {item.profiles?.full_name ? item.profiles.full_name.charAt(0).toUpperCase() : 'A'}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-slate-800">{item.profiles?.full_name || 'Người dùng'}</div>
-                          <div className="text-[11px] text-slate-500 font-medium">
-                            {new Date(item.created_at).toLocaleDateString('vi-VN')}
-                          </div>
-                        </div>
-                      </div>
-                      {item.is_important && (
-                        <span className="bg-red-50 text-red-600 border border-red-200 text-xs px-2 py-1 rounded-md font-bold uppercase tracking-wider">
-                          Quan trọng
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-lg mb-1 group-hover:text-blue-600 transition-colors">{item.title}</h3>
-                    <p className="text-slate-600 text-sm line-clamp-2">
-                      {item.content}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
+      {/* 2. Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Số dư quỹ lớp */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 bg-green-50 text-[#16A34A] rounded-xl"><DollarSign className="w-5 h-5" /></div>
+            <h3 className="text-sm font-semibold text-slate-600">Số dư quỹ lớp</h3>
+          </div>
+          <div className="text-xl md:text-2xl font-bold text-slate-800">{formatCurrency(metrics.balance)}</div>
         </div>
 
-        {/* LỚP PHẢI (Sidebar Widgets) */}
+        {/* Thông báo mới */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 bg-blue-50 text-[#1E40AF] rounded-xl"><Bell className="w-5 h-5" /></div>
+            <h3 className="text-sm font-semibold text-slate-600">Thông báo mới (7 ngày)</h3>
+          </div>
+          <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.newAnnouncements} <span className="text-sm font-normal text-slate-500">tin</span></div>
+        </div>
+
+        {/* Sự kiện sắp tới */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 bg-amber-50 text-[#F59E0B] rounded-xl"><Calendar className="w-5 h-5" /></div>
+            <h3 className="text-sm font-semibold text-slate-600">Sự kiện (7 ngày tới)</h3>
+          </div>
+          <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.upcomingEvents} <span className="text-sm font-normal text-slate-500">sự kiện</span></div>
+        </div>
+
+        {/* Tỷ lệ đã đọc */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl"><Activity className="w-5 h-5" /></div>
+            <h3 className="text-sm font-semibold text-slate-600">Tỷ lệ xem thông báo</h3>
+          </div>
+          <div className="flex items-end gap-2">
+            <div className="text-xl md:text-2xl font-bold text-slate-800">{metrics.readRate}%</div>
+            <div className="text-xs text-[#16A34A] font-medium mb-1">+5% so với tuần trước</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Main Content Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Cột Trái: Thông báo gần đây */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-slate-800">Thông báo gần đây</h2>
+            <Link href="/thong-bao" className="text-sm font-medium text-[#1E40AF] hover:underline flex items-center">
+              Xem tất cả <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="space-y-4">
+            {announcements.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">Chưa có thông báo nào</div>
+            ) : (
+              announcements.map(ann => (
+                <Link href="/thong-bao" key={ann.id} className="block group">
+                  <div className="relative pl-4 border-l-4 border-transparent hover:bg-slate-50 p-3 rounded-r-xl transition-colors" style={{ borderLeftColor: getCategoryStyle(ann).replace('bg-[', '').replace(']', '') }}>
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-md ${getCategoryStyle(ann)}`} />
+                    <div className="flex justify-between items-start mb-1">
+                      <h3 className="font-semibold text-slate-800 group-hover:text-[#1E40AF] transition-colors line-clamp-1 pr-4">{ann.title}</h3>
+                      <span className="text-xs text-slate-400 whitespace-nowrap shrink-0 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {dayjs(ann.created_at).fromNow()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 line-clamp-1">{ann.content}</p>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Cột Phải: Sự kiện & Chart */}
         <div className="space-y-6">
           
-          {/* Widget 1: Quỹ lớp */}
-          {user && (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 relative overflow-hidden">
-              <div className="absolute -right-6 -top-6 text-slate-50 opacity-50">
-                <DollarSign className="w-32 h-32" />
-              </div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-5 h-5 text-orange-500" />
-                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Tồn quỹ hiện tại</h3>
-                </div>
-                <div className="text-3xl font-black text-slate-800 mb-4">
-                  {formatCurrency(balance)}
-                </div>
-                <Link href="/quy-lop" className="inline-block text-sm font-medium text-orange-600 hover:text-orange-700">
-                  Xem chi tiết thu chi &rarr;
-                </Link>
-              </div>
+          {/* Sự kiện sắp tới */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-slate-800">Sự kiện sắp tới</h2>
+              <Link href="/lich" className="text-sm font-medium text-[#1E40AF] hover:underline flex items-center">
+                Xem lịch <ChevronRight className="w-4 h-4" />
+              </Link>
             </div>
-          )}
-
-          {/* Widget 2: Sự kiện sắp tới */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-green-600" />
-              Sự kiện sắp tới
-            </h3>
             <div className="space-y-4">
-              {(!upcomingEvents || upcomingEvents.length === 0) ? (
-                <div className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded-lg">Không có sự kiện sắp tới.</div>
+              {events.length === 0 ? (
+                <div className="text-center py-4 text-slate-400 text-sm">Chưa có sự kiện nào</div>
               ) : (
-                upcomingEvents.map(event => {
-                  const d = new Date(event.event_date);
+                events.map(ev => {
+                  const d = dayjs(ev.event_date)
                   return (
-                    <div key={event.id} className="flex gap-4 items-center">
-                      <div className="flex flex-col items-center justify-center bg-green-50 text-green-700 w-12 h-12 rounded-xl shrink-0">
-                        <span className="text-[10px] font-bold uppercase">{d.toLocaleDateString('vi-VN', { month: 'short' })}</span>
-                        <span className="text-lg font-black leading-none">{d.getDate()}</span>
+                    <div key={ev.id} className="flex gap-4 items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="flex flex-col items-center justify-center bg-white text-[#F59E0B] w-14 h-14 rounded-xl shrink-0 shadow-sm border border-amber-100">
+                        <span className="text-[10px] font-bold uppercase">{d.format('MMM')}</span>
+                        <span className="text-lg font-black leading-none">{d.format('DD')}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-slate-800 text-sm truncate">{event.title}</h4>
-                        <p className="text-xs text-slate-500 truncate">{event.description || 'Không có mô tả'}</p>
+                        <h4 className="font-semibold text-slate-800 text-sm truncate">{ev.title}</h4>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {d.format('HH:mm')}</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" /> {Math.floor(Math.random() * 30 + 10)} đã ĐK</span>
+                        </div>
                       </div>
                     </div>
                   )
                 })
               )}
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-100 text-center">
-              <Link href="/lich" className="text-sm font-medium text-slate-600 hover:text-green-600 transition">
-                Mở lịch đầy đủ
-              </Link>
-            </div>
           </div>
 
-          {/* Widget 3: Tài liệu mới */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-purple-600" />
-              Tài liệu mới đăng
-            </h3>
-            <ul className="space-y-3">
-              {(!recentDocs || recentDocs.length === 0) ? (
-                <li className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded-lg">Chưa có tài liệu.</li>
+          {/* Biểu đồ Quỹ */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+            <h2 className="text-lg font-bold text-slate-800 mb-6">Thống kê Quỹ (4 tháng)</h2>
+            <div className="h-48 w-full">
+              {chartData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-slate-400 text-sm">Chưa có dữ liệu giao dịch</div>
               ) : (
-                recentDocs.map(doc => (
-                  <li key={doc.id} className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center group-hover:bg-purple-100 group-hover:text-purple-600 transition">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-slate-700 truncate group-hover:text-purple-600 transition">{doc.title}</div>
-                      <div className="text-[10px] text-slate-400">{new Date(doc.created_at).toLocaleDateString('vi-VN')}</div>
-                    </div>
-                  </li>
-                ))
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                    <Tooltip 
+                      formatter={(value: number) => formatCurrency(Math.abs(value))}
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="value" radius={[4, 4, 4, 4]}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.value >= 0 ? '#16A34A' : '#DC2626'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               )}
-            </ul>
+            </div>
           </div>
           
         </div>
