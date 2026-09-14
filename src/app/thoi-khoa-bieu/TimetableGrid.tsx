@@ -92,6 +92,75 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
     }
   }
 
+  const renderTable = (title: string, tablePeriods: number[]) => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto relative flex-1">
+      {loading && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+      <div className="p-3 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 text-center uppercase tracking-wider">
+        {title}
+      </div>
+      <table className="w-full text-sm min-w-[700px] border-collapse table-fixed">
+        <thead>
+          <tr className="bg-slate-50 border-b border-slate-200">
+            <th className="p-2 w-16 text-slate-500 font-semibold border-r border-slate-200">Tiết</th>
+            {days.map(d => (
+              <th key={d} className="p-2 font-bold text-slate-700 border-r border-slate-200 last:border-r-0">
+                Thứ {d}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tablePeriods.map(p => (
+            <tr key={p} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors">
+              <td className="p-2 text-center font-medium border-r border-slate-100 bg-slate-50 w-16">
+                <span className="text-base text-slate-700">{p <= 5 ? p : p - 5}</span>
+              </td>
+              {days.map(d => {
+                const item = schedule.find(s => s.day_of_week === d && s.period === p)
+                return (
+                  <td key={`${d}-${p}`} className="p-1.5 border-r border-slate-100 last:border-r-0 h-20 align-top relative group">
+                    {item ? (
+                      <div className={`h-full rounded-lg p-2 border flex flex-col justify-between ${getCellColor(item.subject_group)} ${item.isOverride ? 'ring-1 ring-amber-400 ring-offset-1' : ''}`}>
+                        <div>
+                          <div className="font-bold text-[13px] leading-tight">{item.subject}</div>
+                        </div>
+                        <div className="flex justify-between items-end mt-1">
+                          {item.teacher && <div className="text-[11px] font-medium truncate pr-1">{item.teacher}</div>}
+                          {item.room && <div className="text-[10px] opacity-80 whitespace-nowrap">{item.room}</div>}
+                        </div>
+                        
+                        {item.isOverride && (
+                          <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full" title="Đã thay đổi"></span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="h-full rounded-lg border border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs transition-colors group-hover:bg-slate-50">
+                        -
+                      </div>
+                    )}
+                    
+                    {canManage && (
+                      <button 
+                        onClick={() => handleEditClick(d, p)}
+                        className="absolute top-2 right-2 p-1 bg-white text-blue-600 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
   return (
     <div className="space-y-4">
       {/* Header Controls */}
@@ -125,69 +194,9 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
       </div>
 
       {/* Grid */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto relative">
-        {loading && (
-          <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        )}
-        <table className="w-full text-sm min-w-[800px] border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="p-3 w-16 text-slate-500 font-semibold border-r border-slate-200">Tiết</th>
-              {days.map(d => (
-                <th key={d} className="p-3 font-bold text-slate-700 border-r border-slate-200 last:border-r-0">
-                  Thứ {d}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {periods.map(p => (
-              <tr key={p} className="border-b border-slate-100 last:border-b-0">
-                <td className="p-3 text-center font-medium border-r border-slate-100 bg-slate-50 w-20">
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{p <= 5 ? 'Sáng' : 'Chiều'}</span>
-                    <span className="text-base text-slate-700">Tiết {p <= 5 ? p : p - 5}</span>
-                  </div>
-                </td>
-                {days.map(d => {
-                  const item = schedule.find(s => s.day_of_week === d && s.period === p)
-                  return (
-                    <td key={`${d}-${p}`} className="p-2 border-r border-slate-100 last:border-r-0 h-24 align-top relative group">
-                      {item ? (
-                        <div className={`h-full rounded-lg p-2 border flex flex-col justify-between ${getCellColor(item.subject_group)} ${item.isOverride ? 'ring-1 ring-amber-400 ring-offset-1' : ''}`}>
-                          <div>
-                            <div className="font-bold text-sm">{item.subject}</div>
-                            {item.room && <div className="text-[11px] opacity-80 mt-0.5">Phòng: {item.room}</div>}
-                          </div>
-                          {item.teacher && <div className="text-xs font-medium mt-1 truncate">{item.teacher}</div>}
-                          
-                          {item.isOverride && (
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full" title="Đã thay đổi trong tuần này"></span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="h-full rounded-lg border border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs">
-                          Trống
-                        </div>
-                      )}
-                      
-                      {canManage && (
-                        <button 
-                          onClick={() => handleEditClick(d, p)}
-                          className="absolute top-3 right-3 p-1.5 bg-white text-blue-600 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex flex-col xl:flex-row gap-6 items-start">
+        {renderTable('Ca Sáng', [1, 2, 3, 4, 5])}
+        {renderTable('Ca Chiều', [6, 7, 8, 9, 10])}
       </div>
 
       {editCell && (

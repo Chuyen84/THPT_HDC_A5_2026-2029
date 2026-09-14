@@ -35,7 +35,7 @@ export default async function TimetablePage() {
   const schedule = await getWeeklySchedule(currentWeekStart)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-center gap-3">
         <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl">
           <CalendarDays className="w-6 h-6" />
