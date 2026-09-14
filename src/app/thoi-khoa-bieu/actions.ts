@@ -169,3 +169,24 @@ export async function resetWeeklySchedule(weekStartDate: string) {
 
   revalidatePath('/thoi-khoa-bieu')
 }
+export async function getSubjects() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('subjects').select('*').order('name')
+  return data || []
+}
+
+export async function saveSubject(id: string | null, payload: any) {
+  const supabase = await createClient()
+  if (id) {
+    await supabase.from('subjects').update(payload).eq('id', id)
+  } else {
+    await supabase.from('subjects').insert(payload)
+  }
+  revalidatePath('/thoi-khoa-bieu')
+}
+
+export async function deleteSubject(id: string) {
+  const supabase = await createClient()
+  await supabase.from('subjects').delete().eq('id', id)
+  revalidatePath('/thoi-khoa-bieu')
+}

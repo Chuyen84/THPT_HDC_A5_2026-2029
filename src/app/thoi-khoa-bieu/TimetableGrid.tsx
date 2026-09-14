@@ -15,9 +15,10 @@ interface Props {
   initialSchedule: ScheduleItem[]
   canManage: boolean
   initialWeekStart: string
+  subjects: any[]
 }
 
-export default function TimetableGrid({ initialSchedule, canManage, initialWeekStart }: Props) {
+export default function TimetableGrid({ initialSchedule, canManage, initialWeekStart, subjects }: Props) {
   const [currentDate, setCurrentDate] = useState(dayjs(initialWeekStart))
   const [schedule, setSchedule] = useState<ScheduleItem[]>(initialSchedule)
   const [loading, setLoading] = useState(false)
@@ -208,6 +209,7 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
           period={editCell.period}
           initialData={editCell.data}
           onSuccess={handleEditSuccess}
+          subjects={subjects}
         />
       )}
     </div>
