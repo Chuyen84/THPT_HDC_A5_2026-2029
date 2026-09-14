@@ -272,7 +272,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
                     <Tooltip 
-                      formatter={(value: number) => formatCurrency(Math.abs(value))}
+                      formatter={(value: any) => formatCurrency(Math.abs(Number(value)))}
                       cursor={{ fill: '#f8fafc' }}
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
