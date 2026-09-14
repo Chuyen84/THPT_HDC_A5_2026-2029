@@ -27,6 +27,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { getModulePermission, ModuleKey, parseRoleData } from '@/utils/permissions'
+import NotificationBell from '@/components/NotificationBell'
 
 const navItems: { href: string; icon: any; label: string; moduleKey?: ModuleKey }[] = [
   { href: '/', icon: Home, label: 'Trang chủ' },
@@ -306,26 +307,30 @@ export default function AppLayoutClient({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar on Mobile */}
-        <header className="h-14 lg:hidden bg-slate-900 text-white flex items-center justify-between px-4 border-b border-slate-800 shrink-0">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="p-1.5 -ml-1 text-slate-300 hover:text-white rounded-lg focus:outline-none"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+        {/* Top bar on Desktop & Mobile */}
+        <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 transition-colors">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="p-1.5 -ml-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-lg focus:outline-none lg:hidden"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <span className="font-bold text-sm tracking-tight text-slate-800 dark:text-white lg:hidden">
+              10A5 - THPT Hoài Đức C
+            </span>
+          </div>
 
-          <span className="font-bold text-sm tracking-tight text-white">
-            10A5 - THPT Hoài Đức C
-          </span>
-
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 text-slate-300 hover:text-white rounded-lg focus:outline-none"
-            title="Đổi giao diện"
-          >
-            {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-cyan-300" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {user && <NotificationBell user={user} />}
+            <button
+              onClick={toggleTheme}
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 focus:outline-none"
+              title="Đổi giao diện"
+            >
+              {isDark ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
+            </button>
+          </div>
         </header>
 
         {/* Dynamic Page Content */}
