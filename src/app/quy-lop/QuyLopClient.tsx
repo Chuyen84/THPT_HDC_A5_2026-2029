@@ -37,9 +37,14 @@ export default function QuyLopClient({
           <p className="text-sm text-slate-500">Thu chi minh bạch, rõ ràng</p>
         </div>
         {canManage && (
-          <Link href="/quy-lop/tao-moi" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition text-sm font-semibold shadow-sm">
-            <Plus className="w-4 h-4" /> Thêm khoản Thu / Chi
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/quy-lop/so-quy" className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl hover:bg-slate-200 transition text-sm font-semibold shadow-sm">
+              <FileText className="w-4 h-4" /> Sổ quỹ chi tiết
+            </Link>
+            <Link href="/quy-lop/tao-moi" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition text-sm font-semibold shadow-sm">
+              <Plus className="w-4 h-4" /> Thêm khoản Thu / Chi
+            </Link>
+          </div>
         )}
       </div>
 
