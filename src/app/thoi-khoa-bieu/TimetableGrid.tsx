@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/vi'
 import { CalendarDays, ChevronLeft, ChevronRight, RotateCcw, Edit2 } from 'lucide-react'
 import EditPeriodModal from './EditPeriodModal'
+import ImportExcelModal from './ImportExcelModal'
 import { resetWeeklySchedule } from './actions'
 import { ScheduleItem } from './actions'
 
@@ -80,7 +81,7 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
   }
 
   const days = [2, 3, 4, 5, 6, 7]
-  const periods = [1, 2, 3, 4, 5]
+  const periods = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
   const getCellColor = (group?: string | null) => {
     switch (group) {
@@ -111,12 +112,15 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
         </div>
 
         {canManage && (
-          <button 
-            onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition"
-          >
-            <RotateCcw className="w-4 h-4" /> Áp dụng lịch chuẩn
-          </button>
+          <div className="flex items-center gap-2">
+            <ImportExcelModal weekStartDate={weekStartDateStr} onSuccess={handleEditSuccess} />
+            <button 
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition"
+            >
+              <RotateCcw className="w-4 h-4" /> Áp dụng lịch chuẩn
+            </button>
+          </div>
         )}
       </div>
 
@@ -141,8 +145,11 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
           <tbody>
             {periods.map(p => (
               <tr key={p} className="border-b border-slate-100 last:border-b-0">
-                <td className="p-3 text-center font-medium text-slate-500 border-r border-slate-100 bg-slate-50">
-                  {p}
+                <td className="p-3 text-center font-medium border-r border-slate-100 bg-slate-50 w-20">
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{p <= 5 ? 'Sáng' : 'Chiều'}</span>
+                    <span className="text-base text-slate-700">Tiết {p <= 5 ? p : p - 5}</span>
+                  </div>
                 </td>
                 {days.map(d => {
                   const item = schedule.find(s => s.day_of_week === d && s.period === p)

@@ -29,7 +29,7 @@ export async function getWeeklySchedule(weekStartDate: string): Promise<Schedule
 
   // Combine logic
   for (let d = 2; d <= 7; d++) {
-    for (let p = 1; p <= 5; p++) {
+    for (let p = 1; p <= 10; p++) {
       const wOverride = weekly.find(w => w.day_of_week === d && w.period === p)
       if (wOverride) {
         finalSchedule.push({ ...wOverride, isOverride: true })
@@ -99,6 +99,54 @@ export async function saveWeeklyOverride(
   await supabase.from('announcements').insert({
     title,
     content,
+    is_important: false,
+    author_id: user.id
+  })
+
+  revalidatePath('/thoi-khoa-bieu')
+}
+
+export async function bulkSaveWeeklyOverrides(weekStartDate: string, items: ScheduleItem[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Chưa đăng nhập')
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'gvcn' && !profile.role.includes('admin') && !profile.role.includes('gvcn'))) {
+    throw new Error('Không có quyền thao tác')
+  }
+
+  // delete existing for the week
+  await supabase.from('class_schedule_weekly').delete().eq('week_start_date', weekStartDate)
+
+  // insert new
+  const rows = items.map(item => ({
+    week_start_date: weekStartDate,
+    day_of_week: item.day_of_week,
+    period: item.period,
+    subject: item.subject,
+    teacher: item.teacher || null,
+    room: item.room || null,
+    subject_group: item.subject_group || null
+  }))
+
+  const { error } = await supabase.from('class_schedule_weekly').insert(rows)
+  if (error) throw new Error('Lỗi lưu lịch: ' + error.message)
+
+  // log
+  await supabase.from('schedule_change_log').insert({
+    changed_by: user.id,
+    week_start_date: weekStartDate,
+    day_of_week: 2, // arbitrary for bulk
+    period: 1,
+    old_value: { note: 'Bulk import from Excel' },
+    new_value: { note: `Imported ${items.length} items` }
+  })
+
+  // auto announcement
+  await supabase.from('announcements').insert({
+    title: `[Học tập] Cập nhật thời khóa biểu tuần ${weekStartDate}`,
+    content: `Lớp trưởng/GVCN vừa cập nhật lại thời khóa biểu mới cho tuần ${weekStartDate} từ file Excel. Các bạn vào xem chi tiết nhé.`,
     is_important: false,
     author_id: user.id
   })

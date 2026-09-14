@@ -66,7 +66,7 @@ export default function EditPeriodModal({ isOpen, onClose, weekStartDate, day, p
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
-          <h3 className="font-bold text-slate-800">Sửa Thứ {day} - Tiết {period}</h3>
+          <h3 className="font-bold text-slate-800">Sửa Thứ {day} - {period <= 5 ? 'Sáng' : 'Chiều'} Tiết {period <= 5 ? period : period - 5}</h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-lg transition text-slate-500">
             <X className="w-5 h-5" />
           </button>
