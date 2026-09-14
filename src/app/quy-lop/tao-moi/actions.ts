@@ -11,19 +11,17 @@ export async function submitFund(formData: FormData) {
   if (!user) return
 
   const type = formData.get('type') as string
-  const title = formData.get('title') as string
+  const description = formData.get('description') as string
   const amount = Number(formData.get('amount'))
-  const transaction_date = formData.get('transaction_date') as string
-  const category = formData.get('category') as string || null
-  const receiver = formData.get('receiver') as string || null
+  const date = formData.get('date') as string
+  const category = formData.get('category') as string || (type === 'chi' ? 'khac' : 'thu_dot')
 
-  const { error } = await supabase.from('funds').insert({
+  const { error } = await supabase.from('fund_transactions').insert({
     type,
-    title,
+    description,
     amount,
-    transaction_date,
+    date,
     category,
-    receiver,
     created_by: user.id
   })
 

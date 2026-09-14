@@ -50,31 +50,25 @@ export default async function TaoQuyLopPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Khoản mục (Danh mục)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung / Mô tả</label>
             <input 
-              name="category" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="VD: Quỹ đầu năm, Ăn liên hoan..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung chi tiết</label>
-            <input 
-              name="title" 
+              name="description" 
               required 
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="VD: Thu tiền đồng phục kỳ 1"
+              placeholder="VD: Thu tiền đồng phục kỳ 1 / Chi mua bánh kẹo"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Người nhận tiền / Người nộp</label>
-            <input 
-              name="receiver" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="VD: Đỗ Thị Tâm"
-            />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Danh mục</label>
+            <select name="category" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="khac">Khác</option>
+              <option value="thu_dot">Thu đợt quỹ</option>
+              <option value="tai_tro">Tài trợ / Quét mã</option>
+              <option value="an_uong">Chi ăn uống</option>
+              <option value="in_an">Chi in ấn</option>
+              <option value="khen_thuong">Chi khen thưởng</option>
+            </select>
           </div>
 
           <div>
@@ -93,7 +87,7 @@ export default async function TaoQuyLopPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Ngày giao dịch</label>
             <input 
-              name="transaction_date" 
+              name="date" 
               type="date"
               required 
               defaultValue={new Date().toISOString().split('T')[0]}
