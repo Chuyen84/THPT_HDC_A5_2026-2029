@@ -9,6 +9,7 @@ export interface MenuPermission {
 export type ModuleKey =
   | 'hoc-sinh'
   | 'thong-bao'
+  | 'thoi-khoa-bieu'
   | 'danh-ba'
   | 'quy-lop'
   | 'lich'
@@ -28,6 +29,7 @@ export interface RoleData {
 export const ALL_MODULES: { key: ModuleKey; label: string; href: string }[] = [
   { key: 'hoc-sinh', label: 'Học sinh', href: '/hoc-sinh' },
   { key: 'thong-bao', label: 'Thông báo', href: '/thong-bao' },
+  { key: 'thoi-khoa-bieu', label: 'Thời khóa biểu', href: '/thoi-khoa-bieu' },
   { key: 'danh-ba', label: 'Danh bạ', href: '/danh-ba' },
   { key: 'quy-lop', label: 'Quỹ lớp', href: '/quy-lop' },
   { key: 'lich', label: 'Lịch', href: '/lich' },
@@ -41,6 +43,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<'admin' | 'gvcn' | 'phu_huynh' | '
   admin: {
     'hoc-sinh': { view: true, add: true, edit: true, delete: true },
     'thong-bao': { view: true, add: true, edit: true, delete: true },
+    'thoi-khoa-bieu': { view: true, add: true, edit: true, delete: true },
     'danh-ba': { view: true, add: true, edit: true, delete: true },
     'quy-lop': { view: true, add: true, edit: true, delete: true },
     'lich': { view: true, add: true, edit: true, delete: true },
@@ -51,6 +54,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<'admin' | 'gvcn' | 'phu_huynh' | '
   gvcn: {
     'hoc-sinh': { view: true, add: true, edit: true, delete: true },
     'thong-bao': { view: true, add: true, edit: true, delete: true },
+    'thoi-khoa-bieu': { view: true, add: true, edit: true, delete: true },
     'danh-ba': { view: true, add: true, edit: true, delete: true },
     'quy-lop': { view: true, add: true, edit: true, delete: true },
     'lich': { view: true, add: true, edit: true, delete: true },
@@ -61,6 +65,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<'admin' | 'gvcn' | 'phu_huynh' | '
   phu_huynh: {
     'hoc-sinh': { view: true, add: false, edit: false, delete: false },
     'thong-bao': { view: true, add: false, edit: false, delete: false },
+    'thoi-khoa-bieu': { view: true, add: false, edit: false, delete: false },
     'danh-ba': { view: true, add: false, edit: false, delete: false },
     'quy-lop': { view: true, add: false, edit: false, delete: false },
     'lich': { view: true, add: false, edit: false, delete: false },
@@ -71,6 +76,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<'admin' | 'gvcn' | 'phu_huynh' | '
   hoc_sinh: {
     'hoc-sinh': { view: false, add: false, edit: false, delete: false },
     'thong-bao': { view: true, add: false, edit: false, delete: false },
+    'thoi-khoa-bieu': { view: true, add: false, edit: false, delete: false },
     'danh-ba': { view: true, add: false, edit: false, delete: false },
     'quy-lop': { view: false, add: false, edit: false, delete: false },
     'lich': { view: true, add: false, edit: false, delete: false },
