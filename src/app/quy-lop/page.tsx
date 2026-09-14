@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import FundTable from './FundTable'
 
+export const dynamic = 'force-dynamic'
+
 export default async function QuyLopPage() {
   const supabase = await createClient()
 
