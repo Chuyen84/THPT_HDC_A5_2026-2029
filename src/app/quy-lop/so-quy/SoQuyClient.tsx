@@ -237,8 +237,8 @@ export default function SoQuyClient({ canManage, transactions, locks, userId }: 
               <tr>
                 <th className="px-4 py-3 text-center">STT</th>
                 <th className="px-4 py-3">Ngày tháng</th>
-                <th className="px-4 py-3">Chứng từ</th>
                 <th className="px-4 py-3">Khoản mục</th>
+                <th className="px-4 py-3">Khoản mục chi tiết</th>
                 <th className="px-4 py-3 w-64 max-w-xs">Nội dung</th>
                 <th className="px-4 py-3 text-right">Thu</th>
                 <th className="px-4 py-3 text-right">Chi</th>
@@ -263,12 +263,12 @@ export default function SoQuyClient({ canManage, transactions, locks, userId }: 
                     <tr key={tx.id} className={`hover:bg-slate-50 transition-colors ${isTxLocked ? 'opacity-60 bg-slate-50/50' : ''}`}>
                       <td className="px-4 py-3 text-center text-slate-400">{idx + 1}</td>
                       <td className="px-4 py-3 font-medium text-slate-700">{dayjs(tx.entry_date).format('DD/MM/YYYY')}</td>
+                      <td className="px-4 py-3 text-slate-600 uppercase text-xs font-semibold">{tx.category}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-md text-xs font-bold ${tx.type === 'thu' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                           {tx.voucher_number || '-'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 uppercase text-xs font-semibold">{tx.category}</td>
                       <td className="px-4 py-3 text-slate-800 font-medium whitespace-normal w-64 max-w-xs">{tx.description}</td>
                       <td className="px-4 py-3 text-right text-emerald-600 font-bold">{tx.type === 'thu' ? formatCurrency(tx.amount) : ''}</td>
                       <td className="px-4 py-3 text-right text-red-600 font-bold">{tx.type === 'chi' ? formatCurrency(tx.amount) : ''}</td>
