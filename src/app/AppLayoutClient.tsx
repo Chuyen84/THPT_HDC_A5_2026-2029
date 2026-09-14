@@ -23,6 +23,8 @@ import {
   Sun,
   Moon,
   Phone,
+  CalendarDays,
+  BookOpen,
 } from 'lucide-react'
 import { getModulePermission, ModuleKey, parseRoleData } from '@/utils/permissions'
 
@@ -30,10 +32,11 @@ const navItems: { href: string; icon: any; label: string; moduleKey?: ModuleKey 
   { href: '/', icon: Home, label: 'Trang chủ' },
   { href: '/hoc-sinh', icon: GraduationCap, label: 'Học sinh', moduleKey: 'hoc-sinh' },
   { href: '/thong-bao', icon: Bell, label: 'Thông báo', moduleKey: 'thong-bao' },
+  { href: '/thoi-khoa-bieu', icon: CalendarDays, label: 'Thời khóa biểu', moduleKey: 'thoi-khoa-bieu' },
   { href: '/danh-ba', icon: Users, label: 'Danh bạ', moduleKey: 'danh-ba' },
   { href: '/quy-lop', icon: DollarSign, label: 'Quỹ lớp', moduleKey: 'quy-lop' },
   { href: '/lich', icon: Calendar, label: 'Lịch', moduleKey: 'lich' },
-  { href: '/tai-lieu', icon: FileText, label: 'Tài liệu', moduleKey: 'tai-lieu' },
+  { href: '/tai-lieu', icon: BookOpen, label: 'Tài liệu', moduleKey: 'tai-lieu' },
   { href: '/khao-sat', icon: CheckSquare, label: 'Khảo sát', moduleKey: 'khao-sat' },
   { href: '/hoi-dap', icon: MessageSquare, label: 'Hỏi đáp', moduleKey: 'hoi-dap' },
 ]
