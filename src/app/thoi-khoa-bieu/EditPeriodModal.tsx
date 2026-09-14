@@ -62,6 +62,35 @@ export default function EditPeriodModal({ isOpen, onClose, weekStartDate, day, p
     }
   }
 
+  // Auto-fill map
+  const autoFillMap: Record<string, { teacher: string, group: string }> = {
+    'Toán': { teacher: 'cô Mai', group: 'tu_nhien' },
+    'Toán CĐ': { teacher: 'cô Mai', group: 'tu_nhien' },
+    'Văn': { teacher: 'cô Hoa', group: 'xa_hoi' },
+    'Văn CĐ': { teacher: 'cô Hoa', group: 'xa_hoi' },
+    'Anh': { teacher: 'Cô Hường', group: 'ngoai_ngu' },
+    'Lý': { teacher: 'cô Huệ', group: 'tu_nhien' },
+    'Lý CĐ': { teacher: 'cô Huệ', group: 'tu_nhien' },
+    'Sử': { teacher: 'cô An', group: 'xa_hoi' },
+    'Địa': { teacher: 'thầy Chiến', group: 'xa_hoi' },
+    'GDKTPL': { teacher: 'cô Chung', group: 'xa_hoi' },
+    'GDĐP': { teacher: 'cô Nhung', group: 'khac' },
+    'GDTC': { teacher: 'thầy Đức', group: 'khac' },
+    'GDQP': { teacher: 'cô Vân', group: 'khac' },
+    'CNNN': { teacher: 'cô Nguyệt', group: 'ngoai_ngu' },
+    'SHL': { teacher: 'HĐTN2', group: 'khac' },
+    'Chào cờ': { teacher: 'HĐTN1', group: 'khac' },
+  }
+
+  const handleSubjectChange = (val: string) => {
+    setSubject(val)
+    const match = autoFillMap[val]
+    if (match) {
+      setTeacher(match.teacher)
+      setSubjectGroup(match.group)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -77,13 +106,21 @@ export default function EditPeriodModal({ isOpen, onClose, weekStartDate, day, p
           
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">Môn học *</label>
-            <input 
-              type="text" 
-              value={subject} 
-              onChange={e => setSubject(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
-              placeholder="Nhập tên môn học..."
-            />
+            <div className="relative">
+              <input 
+                type="text" 
+                value={subject} 
+                onChange={e => handleSubjectChange(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                placeholder="Chọn hoặc nhập tên môn..."
+                list="subject-list"
+              />
+              <datalist id="subject-list">
+                {Object.keys(autoFillMap).map(sub => (
+                  <option key={sub} value={sub}>{sub} - {autoFillMap[sub].teacher}</option>
+                ))}
+              </datalist>
+            </div>
           </div>
 
           <div>
