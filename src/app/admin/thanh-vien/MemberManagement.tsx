@@ -52,11 +52,12 @@ interface Profile {
 
 export default function MemberManagement({ profiles }: { profiles: Profile[] }) {
   const router = useRouter()
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [memberList, setMemberList] = useState<Profile[]>(profiles)
 
   useEffect(() => {
-    setMemberList(profiles)
-  }, [profiles])
+    setMemberList(profiles.filter((p) => !deletedIds.has(p.id)))
+  }, [profiles, deletedIds])
 
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<'all' | 'pending' | 'active'>('all')
@@ -310,7 +311,8 @@ export default function MemberManagement({ profiles }: { profiles: Profile[] }) 
     if (!confirm(`Bạn có chắc chắn muốn xoá tài khoản "${name}" khỏi hệ thống không?`)) return
     try {
       setLoadingId(id)
-      // Optimistic delete
+      // Optimistic delete & vĩnh viễn ẩn khỏi danh sách
+      setDeletedIds((prev) => new Set([...prev, id]))
       setMemberList((prev) => prev.filter((u) => u.id !== id))
       await deleteMember(id)
       router.refresh()

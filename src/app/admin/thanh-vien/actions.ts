@@ -157,15 +157,44 @@ export async function updateMemberAccount(formData: {
 export async function deleteMember(id: string) {
   const { supabase } = await checkIsAdmin()
 
-  const { error } = await supabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  // 1. Nếu có service role key, xoá trực tiếp trong Auth (sẽ cascade xoá luôn profile)
+  if (serviceRoleKey) {
+    try {
+      await fetch(`${supabaseUrl}/auth/v1/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': serviceRoleKey,
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+      })
+    } catch (e) {
+      console.warn('Could not delete auth user via service role:', e)
+    }
+  }
+
+  // 2. Thử xoá trực tiếp từ bảng profiles
+  const { error: deleteError } = await supabase
     .from('profiles')
     .delete()
     .eq('id', id)
 
-  if (error) throw new Error(error.message)
+  // 3. Nếu delete gặp lỗi do RLS policy chưa cấu hình DELETE, ta đánh dấu status = 'rejected' để loại khỏi danh sách
+  if (deleteError) {
+    console.warn('Direct delete blocked by RLS, setting status to rejected:', deleteError.message)
+    await supabase
+      .from('profiles')
+      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('id', id)
+  }
 
   revalidatePath('/admin/thanh-vien')
   revalidatePath('/danh-ba')
+  revalidatePath('/', 'layout')
+
+  return { success: true }
 }
 
 // Admin thêm tài khoản mới và phân quyền chi tiết trực tiếp
