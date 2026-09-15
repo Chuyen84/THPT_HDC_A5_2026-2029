@@ -73,7 +73,7 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
     return (str || '')
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\\u0300-\\u036f]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .trim()
   }
 
@@ -84,10 +84,10 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
     if (found) return found
 
     const expandedNorm = norm
-      .replace(/\\bng\\b/g, 'nguyen')
-      .replace(/\\btr\\b/g, 'tran')
-      .replace(/\\bv\\b/g, 'van')
-      .replace(/\\bt\\b/g, 'thi')
+      .replace(/\bng\b/g, 'nguyen')
+      .replace(/\btr\b/g, 'tran')
+      .replace(/\bv\b/g, 'van')
+      .replace(/\bt\b/g, 'thi')
 
     found = students.find(s => {
       const sNorm = normalize(s.full_name)
@@ -208,13 +208,13 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
       const headers = ['STT', 'Họ và tên', 'Tổng cộng', 'Ghi chú']
 
       lines.forEach((line) => {
-        const moneyMatches = line.match(/\\b\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{3})?\\b/g)
-        const dateMatch = line.match(/(\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?)/)
+        const moneyMatches = line.match(/\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{3})?\b/g)
+        const dateMatch = line.match(/(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)/)
         
         let cleanName = line
           .replace(/CK ngày.*$/i, '')
-          .replace(/\\b\\d{1,3}(?:[.,]\\d{3})+\\b/g, '')
-          .replace(/^\\d+[\\s.]*/, '')
+          .replace(/\b\d{1,3}(?:[.,]\d{3})+\b/g, '')
+          .replace(/^\d+[\s.]*/, '')
           .trim()
 
         if (cleanName && cleanName.length > 3 && moneyMatches && moneyMatches.length > 0) {
