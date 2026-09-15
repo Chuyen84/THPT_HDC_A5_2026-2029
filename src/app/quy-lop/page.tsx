@@ -25,8 +25,9 @@ export default async function QuyLopPage() {
 
   const canManage = profile?.role === 'admin' || profile?.role === 'gvcn' || (profile?.role || '').includes('admin') || (profile?.role || '').includes('gvcn')
 
-  // Fetch transactions
-  const { data: transactions } = await supabase
+  // Fetch transactions (support both fund_transactions and funds table)
+  let transactions: any[] = []
+  const { data: txData, error: txErr } = await supabase
     .from('fund_transactions')
     .select(`
       *,
@@ -34,6 +35,27 @@ export default async function QuyLopPage() {
       fund_dues(title)
     `)
     .order('date', { ascending: false })
+
+  if (txData && txData.length > 0) {
+    transactions = txData
+  } else {
+    const { data: fundData } = await supabase
+      .from('funds')
+      .select('*')
+      .order('transaction_date', { ascending: false })
+
+    if (fundData) {
+      transactions = fundData.map(f => ({
+        id: f.id,
+        type: f.type,
+        amount: f.amount,
+        category: f.category || (f.type === 'thu' ? 'thu_dot' : 'khac'),
+        description: f.title,
+        date: f.transaction_date,
+        students: f.receiver ? { full_name: f.receiver } : null,
+      }))
+    }
+  }
 
   let totalThu = 0
   let totalChi = 0
@@ -84,6 +106,12 @@ export default async function QuyLopPage() {
     }
   }
 
+  // Lấy danh sách học sinh để hỗ trợ ánh xạ thông minh khi import
+  const { data: students } = await supabase
+    .from('students')
+    .select('id, full_name, student_code')
+    .order('full_name', { ascending: true })
+
   return (
     <QuyLopClient 
       canManage={!!canManage}
@@ -95,6 +123,7 @@ export default async function QuyLopPage() {
       thuTransactions={thuTxs}
       chiTransactions={chiTxs}
       chiCategoryTotals={chiCategoryTotals}
+      students={students || []}
     />
   )
 }

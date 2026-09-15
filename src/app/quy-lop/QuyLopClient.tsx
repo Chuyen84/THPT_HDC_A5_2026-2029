@@ -2,9 +2,16 @@
 
 import { useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
-import { Wallet, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, AlertCircle, Plus } from 'lucide-react'
+import { Wallet, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, AlertCircle, Plus, Upload, Sparkles } from 'lucide-react'
 import dayjs from 'dayjs'
 import Link from 'next/link'
+import ImportFundModal from './ImportFundModal'
+
+interface Student {
+  id: string
+  full_name: string
+  student_code?: string | null
+}
 
 interface Props {
   canManage: boolean
@@ -16,6 +23,7 @@ interface Props {
   thuTransactions: any[]
   chiTransactions: any[]
   chiCategoryTotals: { category: string, total: number }[]
+  students?: Student[]
 }
 
 const formatCurrency = (amount: number) => {
@@ -24,10 +32,15 @@ const formatCurrency = (amount: number) => {
 
 export default function QuyLopClient({
   canManage, totalThu, totalChi, currentDue, paidStudents, totalStudents,
-  thuTransactions, chiTransactions, chiCategoryTotals
+  thuTransactions, chiTransactions, chiCategoryTotals, students = []
 }: Props) {
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const balance = totalThu - totalChi
   const progressPercent = totalStudents > 0 ? Math.round((paidStudents / totalStudents) * 100) : 0
+
+  const handleImportSuccess = () => {
+    window.location.reload()
+  }
 
   return (
     <div className="space-y-6">
@@ -37,7 +50,13 @@ export default function QuyLopClient({
           <p className="text-sm text-slate-500">Thu chi minh bạch, rõ ràng</p>
         </div>
         {canManage && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition text-sm font-semibold shadow-sm"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-600" /> Import Excel / Ảnh
+            </button>
             <Link href="/quy-lop/so-quy" className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl hover:bg-slate-200 transition text-sm font-semibold shadow-sm">
               <FileText className="w-4 h-4" /> Sổ quỹ chi tiết
             </Link>
@@ -118,8 +137,16 @@ export default function QuyLopClient({
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-5 border-b border-slate-100 bg-slate-50">
+            <div className="p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="font-bold text-slate-800">Lịch sử thu tiền</h3>
+              {canManage && (
+                <button
+                  onClick={() => setIsImportOpen(true)}
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm self-start sm:self-auto"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Import Excel / Ảnh thu tiền
+                </button>
+              )}
             </div>
             <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
               {thuTransactions.length === 0 ? (
@@ -217,6 +244,13 @@ export default function QuyLopClient({
           </div>
         </Tabs.Content>
       </Tabs.Root>
+      {/* Import Fund Modal (Excel / Image OCR) */}
+      <ImportFundModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={handleImportSuccess}
+        students={students}
+      />
     </div>
   )
 }
