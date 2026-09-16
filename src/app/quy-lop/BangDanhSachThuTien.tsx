@@ -11,10 +11,13 @@ import {
   Filter,
   Save,
   X,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { upsertFundPayment, deleteFund } from './actions'
+
+import { useRouter } from 'next/navigation'
 
 interface Student {
   id: string
@@ -59,6 +62,7 @@ export default function BangDanhSachThuTien({
   canManage,
   onOpenImport
 }: Props) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [editingStudent, setEditingStudent] = useState<{
@@ -70,14 +74,17 @@ export default function BangDanhSachThuTien({
     note: string
   } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletedTxIds, setDeletedTxIds] = useState<string[]>([])
   const [error, setError] = useState('')
 
-  // Map each student to their payment records
+  // Map each student to their payment records (filter out optimistically deleted txs)
   const studentPaymentList = useMemo(() => {
+    const activeTxs = thuTransactions.filter(t => !deletedTxIds.includes(t.id))
     const txByStudent: Record<string, ThuTransaction[]> = {}
     const extraTxs: ThuTransaction[] = []
 
-    thuTransactions.forEach(tx => {
+    activeTxs.forEach(tx => {
       const studentName = tx.students?.full_name || ''
       let matchedStudent = students.find(s => s.id === tx.student_id)
       if (!matchedStudent && studentName) {
@@ -132,7 +139,7 @@ export default function BangDanhSachThuTien({
     })
 
     return list
-  }, [students, thuTransactions])
+  }, [students, thuTransactions, deletedTxIds])
 
   const filteredList = useMemo(() => {
     return studentPaymentList.filter(item => {
@@ -180,6 +187,7 @@ export default function BangDanhSachThuTien({
         note: editingStudent.note
       })
       setEditingStudent(null)
+      router.refresh()
     } catch (err: any) {
       setError(err.message || 'Lỗi khi cập nhật khoản thu.')
     } finally {
@@ -188,11 +196,20 @@ export default function BangDanhSachThuTien({
   }
 
   const handleDelete = async (txId: string, studentName: string) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa bản ghi thu tiền của học sinh "${studentName}"?`)) return
+    if (!window.confirm(`Bạn có chắc muốn xóa khoản thu của "${studentName}"? Thao tác này sẽ xóa vĩnh viễn khoản nộp.`)) return
+    setDeletingId(txId)
+    // Cập nhật giao diện ngay lập tức (optimistic UI)
+    setDeletedTxIds(prev => [...prev, txId])
+
     try {
       await deleteFund(txId)
+      router.refresh()
     } catch (err: any) {
+      // Hoàn tác nếu lỗi
+      setDeletedTxIds(prev => prev.filter(id => id !== txId))
       alert(err.message || 'Lỗi khi xóa khoản thu.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -393,11 +410,16 @@ export default function BangDanhSachThuTien({
                         {item.transactionId && (
                           <button
                             type="button"
+                            disabled={deletingId === item.transactionId}
                             onClick={() => handleDelete(item.transactionId!, item.studentName)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
                             title="Xóa khoản thu"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {deletingId === item.transactionId ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
                           </button>
                         )}
                       </div>

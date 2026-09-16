@@ -38,22 +38,23 @@ export default async function QuyLopPage() {
 
   if (txData && txData.length > 0) {
     transactions = txData
-  } else {
     const { data: fundData } = await supabase
       .from('funds')
       .select('*')
       .order('transaction_date', { ascending: false })
 
     if (fundData) {
-      transactions = fundData.map(f => ({
-        id: f.id,
-        type: f.type,
-        amount: f.amount,
-        category: f.category || (f.type === 'thu' ? 'thu_dot' : 'khac'),
-        description: f.title,
-        date: f.transaction_date,
-        students: f.receiver ? { full_name: f.receiver } : null,
-      }))
+      transactions = fundData
+        .filter(f => f.type !== 'deleted' && Number(f.amount) > 0)
+        .map(f => ({
+          id: f.id,
+          type: f.type,
+          amount: f.amount,
+          category: f.category || (f.type === 'thu' ? 'thu_dot' : 'khac'),
+          description: f.title,
+          date: f.transaction_date,
+          students: f.receiver ? { full_name: f.receiver } : null,
+        }))
     }
   }
 
