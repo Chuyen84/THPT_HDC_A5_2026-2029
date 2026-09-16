@@ -74,6 +74,8 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd')
       .trim()
   }
 
@@ -118,7 +120,7 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
         catIdx = idx
       }
 
-      if (text.includes('bhtt') || text.includes('nuoc') || text.includes('lldt') || text.includes('enetviet') || text.includes('dieu hoa') || text.includes('cmhs') || text.includes('quy lop')) {
+      if (text.includes('bhtt') || text.includes('nuoc') || text.includes('lldt') || text.includes('enetviet') || text.includes('dieu hoa') || text.includes('cmhs') || text.includes('quy lop') || text.includes('hoc phi') || text.includes('bao hiem')) {
         detectedFeeCols[idx] = h
       }
     })
@@ -263,14 +265,14 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
   const parseDate = (val: any, noteVal: any): string => {
     if (val) {
       const str = String(val).trim()
-      const dmy = str.match(/(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4})/)
+      const dmy = str.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
       if (dmy) {
         return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
       }
     }
     if (noteVal) {
       const str = String(noteVal).trim()
-      const dmy = str.match(/(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4})/)
+      const dmy = str.match(/(\d{1,2})[/-](\\d{1,2})[/-](\d{4})/) || str.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
       if (dmy) {
         return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
       }
@@ -289,7 +291,7 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
 
     rawRows.forEach((row) => {
       const rawName = mapping.studentNameCol !== -1 ? String(row[mapping.studentNameCol] || '').trim() : ''
-      if (!rawName || normalize(rawName).includes('tong cong') || normalize(rawName).includes('nguoi lap')) {
+      if (!rawName || normalize(rawName).includes('tong cong') || normalize(rawName).includes('nguoi lap') || normalize(rawName).includes('ha noi, ngay')) {
         return
       }
 
@@ -301,7 +303,26 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
       const entryDate = parseDate(mapping.dateCol !== -1 ? row[mapping.dateCol] : null, noteText)
 
       if (!multiColMode || Object.keys(selectedFeeCols).length === 0) {
-        const amount = mapping.amountCol !== -1 ? parseAmount(row[mapping.amountCol]) : 0
+        let amount = mapping.amountCol !== -1 ? parseAmount(row[mapping.amountCol]) : 0
+
+        // Thông minh: Nếu cột Tổng số tiền đang trống/bằng 0 nhưng có các cột thành phần chi phí trong hàng, tự động cộng dồn
+        if (amount === 0 && Object.keys(selectedFeeCols).length > 0) {
+          amount = Object.keys(selectedFeeCols).reduce((sum, colIdxStr) => {
+            return sum + parseAmount(row[parseInt(colIdxStr, 10)])
+          }, 0)
+        }
+
+        // Tự động quét các ô có giá trị số tiền nếu vẫn bằng 0
+        if (amount === 0) {
+          const rowNums = row
+            .filter((cell, idx) => idx !== mapping.studentNameCol && idx !== mapping.noteCol && idx !== 0)
+            .map(c => parseAmount(c))
+            .filter(n => n > 1000)
+          if (rowNums.length > 0) {
+            amount = rowNums.reduce((a, b) => a + b, 0)
+          }
+        }
+
         if (amount > 0) {
           items.push({
             studentName,
@@ -608,15 +629,31 @@ export default function ImportFundModal({ isOpen, onClose, onSuccess, students }
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {rawRows.slice(0, 5).map((row, rIdx) => (
-                        <tr key={rIdx} className="hover:bg-slate-50">
-                          {rawHeaders.map((_, cIdx) => (
-                            <td key={cIdx} className={`p-2.5 whitespace-nowrap ${cIdx === mapping.studentNameCol ? 'font-semibold text-blue-900 bg-blue-50/50' : cIdx === mapping.amountCol ? 'font-bold text-emerald-700 bg-emerald-50/50' : 'text-slate-600'}`}>
-                              {String(row[cIdx] || '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
+                      {rawRows.slice(0, 8).map((row, rIdx) => {
+                        let rowAmt = mapping.amountCol !== -1 ? parseAmount(row[mapping.amountCol]) : 0
+                        if (rowAmt === 0 && Object.keys(selectedFeeCols).length > 0) {
+                          rowAmt = Object.keys(selectedFeeCols).reduce((sum, colIdxStr) => sum + parseAmount(row[parseInt(colIdxStr, 10)]), 0)
+                        }
+                        return (
+                          <tr key={rIdx} className="hover:bg-slate-50">
+                            {rawHeaders.map((_, cIdx) => {
+                              const isAmount = cIdx === mapping.amountCol
+                              const isName = cIdx === mapping.studentNameCol
+                              let displayVal = String(row[cIdx] !== null && row[cIdx] !== undefined ? row[cIdx] : '')
+                              if (isAmount && (!displayVal || displayVal === '0') && rowAmt > 0) {
+                                displayVal = `${formatCurrency(rowAmt)} (tự tính)`
+                              } else if (typeof row[cIdx] === 'number' && row[cIdx] > 1000) {
+                                displayVal = formatCurrency(row[cIdx])
+                              }
+                              return (
+                                <td key={cIdx} className={`p-2.5 whitespace-nowrap ${isName ? 'font-semibold text-blue-900 bg-blue-50/50' : isAmount ? 'font-bold text-emerald-700 bg-emerald-50/50' : 'text-slate-600'}`}>
+                                  {displayVal}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

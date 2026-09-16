@@ -6,6 +6,7 @@ import { Wallet, ArrowDownCircle, ArrowUpCircle, FileText, CheckCircle2, AlertCi
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import ImportFundModal from './ImportFundModal'
+import BangDanhSachThuTien from './BangDanhSachThuTien'
 
 interface Student {
   id: string
@@ -135,6 +136,14 @@ export default function QuyLopClient({
               )}
             </div>
           </div>
+
+          {/* Bảng danh sách thu tiền theo học sinh (chuẩn theo mẫu Excel / Bảng thu) */}
+          <BangDanhSachThuTien
+            students={students}
+            thuTransactions={thuTransactions}
+            canManage={canManage}
+            onOpenImport={() => setIsImportOpen(true)}
+          />
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

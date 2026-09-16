@@ -97,3 +97,83 @@ export async function bulkImportFunds(items: ImportFundItem[]) {
   return { success: true, count: items.length }
 }
 
+export async function upsertFundPayment(data: {
+  id?: string
+  studentName: string
+  studentId?: string
+  amount: number
+  date: string
+  note?: string
+  category?: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Chưa đăng nhập')
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin' && profile?.role !== 'gvcn' && !profile?.role?.includes('admin') && !profile?.role?.includes('gvcn')) {
+    throw new Error('Chỉ Quản trị viên hoặc GVCN mới có quyền chỉnh sửa')
+  }
+
+  const title = `Thu tiền học kỳ: ${data.studentName}`
+  const noteSuffix = data.note ? ` - ${data.note}` : ''
+  const fullTitle = `${title}${noteSuffix}`
+
+  if (data.id) {
+    // Update existing
+    const { error: txErr } = await supabase
+      .from('fund_transactions')
+      .update({
+        amount: data.amount,
+        date: data.date,
+        description: fullTitle,
+        student_id: data.studentId || null,
+        category: data.category || 'thu_dot'
+      })
+      .eq('id', data.id)
+
+    if (txErr) {
+      // Fallback update funds
+      const { error: fundErr } = await supabase
+        .from('funds')
+        .update({
+          amount: data.amount,
+          transaction_date: data.date,
+          title: fullTitle,
+          receiver: data.studentName,
+          category: data.category || 'thu_dot'
+        })
+        .eq('id', data.id)
+
+      if (fundErr) throw new Error('Lỗi cập nhật khoản thu: ' + fundErr.message)
+    }
+  } else {
+    // Insert new
+    const { error: txErr } = await supabase.from('fund_transactions').insert({
+      type: 'thu',
+      amount: data.amount,
+      date: data.date,
+      description: fullTitle,
+      student_id: data.studentId || null,
+      category: data.category || 'thu_dot',
+      created_by: user.id
+    })
+
+    if (txErr) {
+      const { error: fundErr } = await supabase.from('funds').insert({
+        title: fullTitle,
+        amount: data.amount,
+        type: 'thu',
+        transaction_date: data.date,
+        category: data.category || 'thu_dot',
+        receiver: data.studentName,
+        created_by: user.id
+      })
+      if (fundErr) throw new Error('Lỗi tạo mới khoản thu: ' + fundErr.message)
+    }
+  }
+
+  revalidatePath('/quy-lop')
+  return { success: true }
+}
+
