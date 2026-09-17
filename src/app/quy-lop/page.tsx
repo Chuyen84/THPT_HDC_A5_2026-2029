@@ -20,16 +20,34 @@ export default async function QuyLopPage() {
   // Fetch concurrently
   const [
     { data: profile },
-    { data: transactions },
-    { data: dues }
+    { data: txData },
+    { data: dues },
+    { data: fundData }
   ] = await Promise.all([
     supabase.from('profiles').select('role').eq('id', user.id).single(),
     supabase.from('fund_transactions').select('*, students(full_name), fund_dues(title)').order('date', { ascending: false }),
-    supabase.from('fund_dues').select('*').order('start_date', { ascending: false }).limit(1)
+    supabase.from('fund_dues').select('*').order('start_date', { ascending: false }).limit(1),
+    supabase.from('funds').select('*').order('transaction_date', { ascending: false })
   ])
 
   const canManage = profile?.role === 'admin' || profile?.role === 'gvcn' || (profile?.role || '').includes('admin') || (profile?.role || '').includes('gvcn')
 
+  // Support both fund_transactions and funds table
+  let transactions: any[] = txData || []
+
+  if (transactions.length > 0 && fundData) {
+    transactions = fundData
+      .filter(f => f.type !== 'deleted' && Number(f.amount) > 0)
+      .map(f => ({
+        id: f.id,
+        type: f.type,
+        amount: f.amount,
+        category: f.category || (f.type === 'thu' ? 'thu_dot' : 'khac'),
+        description: f.title,
+        date: f.transaction_date,
+        students: f.receiver ? { full_name: f.receiver } : null,
+      }))
+  }
   let totalThu = 0
   let totalChi = 0
   const thuTxs: any[] = []
@@ -72,6 +90,12 @@ export default async function QuyLopPage() {
     }
   }
 
+  // Lấy danh sách học sinh để hỗ trợ ánh xạ thông minh khi import
+  const { data: students } = await supabase
+    .from('students')
+    .select('id, full_name, student_code')
+    .order('full_name', { ascending: true })
+
   return (
     <QuyLopClient 
       canManage={!!canManage}
@@ -83,6 +107,7 @@ export default async function QuyLopPage() {
       thuTransactions={thuTxs}
       chiTransactions={chiTxs}
       chiCategoryTotals={chiCategoryTotals}
+      students={students || []}
     />
   )
 }
