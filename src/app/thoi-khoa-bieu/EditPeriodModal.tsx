@@ -56,34 +56,27 @@ export default function EditPeriodModal({ isOpen, onClose, weekStartDate, day, p
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Gộp danh sách subjects từ database và danh sách chuẩn THPT
-  const mergedSubjects: HighSchoolSubject[] = (() => {
-    const list = [...DEFAULT_HIGH_SCHOOL_SUBJECTS]
-    // Nếu có subjects từ DB, bổ sung hoặc override
-    subjects.forEach((s) => {
-      const idx = list.findIndex(
-        (item) =>
-          item.name.toLowerCase() === s.name?.toLowerCase() ||
-          item.shortName.toLowerCase() === s.abbreviation?.toLowerCase()
-      )
-      if (idx !== -1) {
-        list[idx] = {
-          ...list[idx],
-          teacher: s.teacher_name || list[idx].teacher,
-          shortName: s.abbreviation || list[idx].shortName,
-        }
-      } else if (s.name) {
-        list.push({
-          name: s.name,
-          shortName: s.abbreviation || s.name,
-          teacher: s.teacher_name || '',
-          room: 'P.205',
-          group: 'khac',
-        })
-      }
-    })
-    return list
-  })()
+  // Hàm tự động nhận diện nhóm môn
+  const detectSubjectGroup = (subjName: string): 'tu_nhien' | 'xa_hoi' | 'ngoai_ngu' | 'khac' => {
+    const s = subjName.toLowerCase().trim()
+    if (s.includes('toán') || s.includes('lý') || s.includes('hóa') || s.includes('sinh') || s.includes('tin') || s.includes('công nghệ')) return 'tu_nhien'
+    if (s.includes('văn') || s.includes('sử') || s.includes('địa') || s.includes('gdcd') || s.includes('ktpl') || s.includes('pháp luật')) return 'xa_hoi'
+    if (s.includes('anh') || s.includes('ngoại ngữ') || s.includes('tiếng')) return 'ngoai_ngu'
+    return 'khac'
+  }
+
+  // Tùy chỉnh danh sách môn học từ DB (subjects)
+  const mergedSubjects: HighSchoolSubject[] = subjects.map((s) => ({
+    name: s.name,
+    shortName: s.abbreviation || s.name,
+    teacher: s.teacher_name || '',
+    room: s.room || 'P.205',
+    group: detectSubjectGroup(s.name),
+    aliases: []
+  }))
+
+  // Tạo danh sách giáo viên duy nhất từ database
+  const uniqueTeachers = Array.from(new Set(mergedSubjects.map(s => s.teacher).filter(t => t.trim() !== '')))
 
   // Lọc môn học theo từ khóa tìm kiếm khi người dùng gõ
   const filteredSubjects = mergedSubjects.filter((s) => {
@@ -128,15 +121,6 @@ export default function EditPeriodModal({ isOpen, onClose, weekStartDate, day, p
     setRoom(item.room || 'P.205')
     setSubjectGroup(item.group || 'khac')
     setIsDropdownOpen(false)
-  }
-
-  // Tự động nhận diện nhóm môn nếu người dùng tự gõ tay tên môn
-  const detectSubjectGroup = (subjName: string): 'tu_nhien' | 'xa_hoi' | 'ngoai_ngu' | 'khac' => {
-    const s = subjName.toLowerCase().trim()
-    if (s.includes('toán') || s.includes('lý') || s.includes('hóa') || s.includes('sinh') || s.includes('tin') || s.includes('công nghệ')) return 'tu_nhien'
-    if (s.includes('văn') || s.includes('sử') || s.includes('địa') || s.includes('gdcd') || s.includes('ktpl') || s.includes('pháp luật')) return 'xa_hoi'
-    if (s.includes('anh') || s.includes('ngoại ngữ') || s.includes('tiếng')) return 'ngoai_ngu'
-    return 'khac'
   }
 
   const handleSubjectInputChange = (val: string) => {
@@ -307,11 +291,17 @@ export default function EditPeriodModal({ isOpen, onClose, weekStartDate, day, p
             <label className="block text-sm font-medium text-slate-700 mb-1">Giáo viên</label>
             <input
               type="text"
+              list="teachersList"
               value={teacher}
               onChange={(e) => setTeacher(e.target.value)}
               className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none placeholder:text-slate-400"
               placeholder="VD: Cô Mai, Thầy Vinh..."
             />
+            <datalist id="teachersList">
+              {uniqueTeachers.map((t, idx) => (
+                <option key={idx} value={t} />
+              ))}
+            </datalist>
           </div>
 
           {/* Grid: Phòng học & Nhóm môn */}

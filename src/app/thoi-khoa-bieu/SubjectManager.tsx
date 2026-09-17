@@ -139,7 +139,12 @@ export default function SubjectManager({ subjects, canManage }: Props) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Giáo viên phụ trách *</label>
-                <input required value={teacher} onChange={e => setTeacher(e.target.value)} placeholder="VD: Cô Nga" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                <input required list="teacherListMgr" value={teacher} onChange={e => setTeacher(e.target.value)} placeholder="VD: Cô Nga" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                <datalist id="teacherListMgr">
+                  {Array.from(new Set(subjects.map(s => s.teacher_name).filter(t => t?.trim() !== ''))).map((t, idx) => (
+                    <option key={idx} value={t} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại liên hệ</label>
