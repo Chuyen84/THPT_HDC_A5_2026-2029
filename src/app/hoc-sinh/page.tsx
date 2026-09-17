@@ -7,22 +7,25 @@ export default async function HocSinhPage() {
 
   const { data: { user } } = await supabase.auth.getUser()
   let canManage = false
+  let students: any[] = []
 
   if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const [
+      { data: profile },
+      { data: stds }
+    ] = await Promise.all([
+      supabase.from('profiles').select('role').eq('id', user.id).single(),
+      supabase.from('students').select('*').order('full_name', { ascending: true })
+    ])
+    
     if (profile?.role === 'admin' || profile?.role === 'gvcn') {
       canManage = true
     }
+    students = stds || []
+  } else {
+    const { data: stds } = await supabase.from('students').select('*').order('full_name', { ascending: true })
+    students = stds || []
   }
-
-  const { data: students } = await supabase
-    .from('students')
-    .select('*')
-    .order('full_name', { ascending: true })
 
   return (
     <div className="space-y-3">

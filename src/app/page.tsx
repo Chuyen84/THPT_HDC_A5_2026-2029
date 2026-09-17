@@ -37,18 +37,36 @@ export default function Dashboard() {
     async function fetchData() {
       setLoading(true)
       try {
-        // 1. Fetch Funds for Balance & Chart
-        const { data: funds } = await supabase.from('funds').select('amount, type, created_at')
+        // 1. Fetch current user first to fetch profile/ocr concurrently
+        const { data: { user } } = await supabase.auth.getUser()
+
+        const now = new Date().toISOString()
+        
+        // Fetch all independent data concurrently
+        const [
+          { data: txs },
+          { data: recentAnns },
+          { data: upEvents },
+          profileRes,
+          ocrRes
+        ] = await Promise.all([
+          supabase.from('fund_transactions').select('amount, type, entry_date'),
+          supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(10),
+          supabase.from('events').select('*').gte('event_date', now).order('event_date', { ascending: true }),
+          user ? supabase.from('profiles').select('role').eq('id', user.id).single() : Promise.resolve({ data: null }),
+          user ? supabase.from('ocr_import_queue').select('*', { count: 'exact', head: true }).eq('status', 'cho_duyet') : Promise.resolve({ count: 0 })
+        ])
+
         let total = 0
         const monthlyData: Record<string, number> = {}
         
-        if (funds) {
-          funds.forEach(f => {
+        if (txs) {
+          txs.forEach(f => {
             const isThu = f.type === 'thu'
             const amount = Number(f.amount)
             total += isThu ? amount : -amount
             
-            const monthStr = dayjs(f.created_at).format('MM/YYYY')
+            const monthStr = dayjs(f.entry_date).format('MM/YYYY')
             if (!monthlyData[monthStr]) monthlyData[monthStr] = 0
             monthlyData[monthStr] += isThu ? amount : -amount
           })
@@ -63,40 +81,24 @@ export default function Dashboard() {
             value: monthlyData[k]
           }))
 
-        // 2. Fetch Announcements (Last 7 days count & Recent 3)
+        // Announcements (Last 7 days count)
         const sevenDaysAgo = dayjs().subtract(7, 'day').toISOString()
-        const { data: recentAnns } = await supabase
-          .from('announcements')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10)
-          
         const newAnnsCount = recentAnns?.filter(a => dayjs(a.created_at).isAfter(sevenDaysAgo)).length || 0
 
-        // 3. Fetch Events (Next 7 days count & Recent 2)
-        const now = new Date().toISOString()
+        // Events (Next 7 days count)
         const next7Days = dayjs().add(7, 'day').toISOString()
-        const { data: upEvents } = await supabase
-          .from('events')
-          .select('*')
-          .gte('event_date', now)
-          .order('event_date', { ascending: true })
-        
         const next7EventsCount = upEvents?.filter(e => dayjs(e.event_date).isBefore(next7Days)).length || 0
         const upcomingCount = next7EventsCount
 
-        // 4. Fetch Role & OCR Queue
-        const { data: { user } } = await supabase.auth.getUser()
+        let userRole = ''
+        let pending = 0
         if (user) {
-          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-          if (profile) {
-            setRole(profile.role)
-            if (profile.role.includes('admin') || profile.role.includes('gvcn')) {
-              const { count } = await supabase.from('ocr_import_queue').select('*', { count: 'exact', head: true }).eq('status', 'cho_duyet')
-              setPendingOcr(count || 0)
-            }
-          }
+          userRole = profileRes.data?.role || ''
+          pending = ocrRes.count || 0
         }
+
+        setRole(userRole)
+        setPendingOcr(pending)
 
         setMetrics({
           balance: total,

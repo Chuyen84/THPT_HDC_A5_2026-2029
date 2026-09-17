@@ -17,23 +17,18 @@ export default async function QuyLopPage() {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  // Fetch concurrently
+  const [
+    { data: profile },
+    { data: transactions },
+    { data: dues }
+  ] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user.id).single(),
+    supabase.from('fund_transactions').select('*, students(full_name), fund_dues(title)').order('date', { ascending: false }),
+    supabase.from('fund_dues').select('*').order('start_date', { ascending: false }).limit(1)
+  ])
 
   const canManage = profile?.role === 'admin' || profile?.role === 'gvcn' || (profile?.role || '').includes('admin') || (profile?.role || '').includes('gvcn')
-
-  // Fetch transactions
-  const { data: transactions } = await supabase
-    .from('fund_transactions')
-    .select(`
-      *,
-      students(full_name),
-      fund_dues(title)
-    `)
-    .order('date', { ascending: false })
 
   let totalThu = 0
   let totalChi = 0
@@ -61,13 +56,6 @@ export default async function QuyLopPage() {
     total: chiCategories[cat]
   })).sort((a, b) => b.total - a.total)
 
-  // Fetch current due
-  const { data: dues } = await supabase
-    .from('fund_dues')
-    .select('*')
-    .order('start_date', { ascending: false })
-    .limit(1)
-  
   const currentDue = dues && dues.length > 0 ? dues[0] : null
   let paidStudents = 0
   let totalStudents = 0

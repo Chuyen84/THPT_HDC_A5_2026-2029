@@ -7,22 +7,25 @@ export default async function ThongBaoPage() {
 
   const { data: { user } } = await supabase.auth.getUser()
   let canManage = false
+  let announcements: any[] = []
 
   if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const [
+      { data: profile },
+      { data: ann }
+    ] = await Promise.all([
+      supabase.from('profiles').select('role').eq('id', user.id).single(),
+      supabase.from('announcements').select('*, profiles(full_name, role)').order('created_at', { ascending: false })
+    ])
+    
     if (profile?.role === 'admin' || profile?.role === 'gvcn') {
       canManage = true
     }
+    announcements = ann || []
+  } else {
+    const { data: ann } = await supabase.from('announcements').select('*, profiles(full_name, role)').order('created_at', { ascending: false })
+    announcements = ann || []
   }
-  
-  const { data: announcements } = await supabase
-    .from('announcements')
-    .select('*, profiles(full_name, role)')
-    .order('created_at', { ascending: false })
 
   return (
     <div className="space-y-6">
