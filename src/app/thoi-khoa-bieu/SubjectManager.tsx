@@ -16,7 +16,10 @@ interface Props {
   canManage: boolean
 }
 
+import { useRouter } from 'next/navigation'
+
 export default function SubjectManager({ subjects, canManage }: Props) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   
@@ -55,7 +58,7 @@ export default function SubjectManager({ subjects, canManage }: Props) {
         teacher_phone: phone
       })
       setIsOpen(false)
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       console.error(err)
       alert('Lỗi lưu môn học')
@@ -69,7 +72,7 @@ export default function SubjectManager({ subjects, canManage }: Props) {
     try {
       const { deleteSubject } = await import('./actions')
       await deleteSubject(id)
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       console.error(err)
       alert('Lỗi xóa môn học')

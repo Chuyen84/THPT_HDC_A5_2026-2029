@@ -200,6 +200,29 @@ export default function TimetableGrid({ initialSchedule, canManage, initialWeekS
         {renderTable('Ca Chiều', [6, 7, 8, 9, 10])}
       </div>
 
+      {/* Legend / Ghi chú thời gian */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-slate-700 flex flex-col md:flex-row gap-6 md:gap-12 mt-2">
+        <div>
+          <h4 className="font-bold text-blue-800 mb-2">Buổi Sáng</h4>
+          <ul className="space-y-1">
+            <li><span className="font-semibold w-12 inline-block">Tiết 1:</span> 7h15 - 8h00</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 2:</span> 8h10 - 8h55</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 3:</span> 9h00 - 9h45</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 4:</span> 9h50 - 10h35</li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-bold text-blue-800 mb-2">Buổi Chiều</h4>
+          <ul className="space-y-1">
+            <li><span className="font-semibold w-12 inline-block">Tiết 1:</span> 12h55 - 13h40</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 2:</span> 13h50 - 14h35</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 3:</span> 14h40 - 15h25</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 4:</span> 15h30 - 16h15</li>
+            <li><span className="font-semibold w-12 inline-block">Tiết 5:</span> 16h25 - 17h10</li>
+          </ul>
+        </div>
+      </div>
+
       {editCell && (
         <EditPeriodModal 
           isOpen={isModalOpen}
