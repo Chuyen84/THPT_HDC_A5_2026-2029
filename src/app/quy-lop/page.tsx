@@ -33,9 +33,11 @@ export default async function QuyLopPage() {
   const canManage = profile?.role === 'admin' || profile?.role === 'gvcn' || (profile?.role || '').includes('admin') || (profile?.role || '').includes('gvcn')
 
   // Support both fund_transactions and funds table
-  let transactions: any[] = txData || []
+  let transactions: any[] = []
 
-  if (transactions.length > 0 && fundData) {
+  if (txData && txData.length > 0) {
+    transactions = txData
+  } else if (fundData && fundData.length > 0) {
     transactions = fundData
       .filter(f => f.type !== 'deleted' && Number(f.amount) > 0)
       .map(f => ({
